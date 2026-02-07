@@ -1,0 +1,278 @@
+/* ===== Reset & Base ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #e0e0e0;
+  background-color: #1a1a2e;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Page Layout ===== */
+.page {
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+h1 {
+  font-size: 1.8rem;
+  text-align: center;
+  color: #fff;
+}
+
+h2 {
+  font-size: 1.1rem;
+  color: #ccc;
+}
+
+p {
+  text-align: center;
+  color: #aaa;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #4ecca3;
+  color: #1a1a2e;
+}
+
+.btn-secondary {
+  background: #393e6e;
+  color: #e0e0e0;
+}
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+/* ===== Forms ===== */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="number"] {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #393e6e;
+  border-radius: 6px;
+  background: #16213e;
+  color: #fff;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input:focus {
+  border-color: #4ecca3;
+}
+
+.row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.row > label {
+  flex: 1;
+}
+
+.checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #4ecca3;
+}
+
+.error {
+  color: #e74c3c;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.muted {
+  color: #666;
+  font-style: italic;
+}
+
+/* ===== Lobby ===== */
+.lobby-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.game-code {
+  font-size: 1.2rem;
+  letter-spacing: 0.15em;
+  color: #aaa;
+}
+
+.game-code strong {
+  color: #4ecca3;
+  font-size: 1.4rem;
+}
+
+.connection-status {
+  font-size: 0.85rem;
+}
+
+.connection-status.online {
+  color: #4ecca3;
+}
+
+.connection-status.offline {
+  color: #e74c3c;
+}
+
+.settings-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+/* ===== Player List ===== */
+.player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #16213e;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+.player-row.me {
+  border-color: #4ecca3;
+}
+
+.conn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.conn-dot.on {
+  background: #4ecca3;
+}
+
+.conn-dot.off {
+  background: #555;
+}
+
+.player-name {
+  flex: 1;
+  font-weight: 500;
+  color: #fff;
+}
+
+.ready-badge {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.ready-badge.ready {
+  background: #4ecca333;
+  color: #4ecca3;
+}
+
+.ready-badge.not-ready {
+  background: #e74c3c22;
+  color: #e74c3c;
+}
+
+/* ===== Lobby Actions ===== */
+.lobby-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.lobby-actions .btn {
+  flex: 1;
+}
+
+.share-hint {
+  font-size: 0.8rem;
+  color: #666;
+  text-align: center;
+  margin-top: 0.5rem;
+}
