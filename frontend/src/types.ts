@@ -105,6 +105,13 @@ export interface EngineState {
 
 /** WebSocket message wrapper. */
 export interface WsMessage {
-  type: "game_state" | "lobby_state";
+  type: "game_state" | "lobby_state" | "connection_info" | "ping";
   data: EngineState;
+}
+
+/** Connection info broadcast from server. */
+export interface ConnectionInfo {
+  type: "connection_info";
+  connected_players: string[];
+  spectator_count: number;
 }

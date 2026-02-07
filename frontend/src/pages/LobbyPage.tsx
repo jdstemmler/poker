@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { buildWsUrl, getGame, toggleReady, startGame } from "../api";
 import { useGameSocket } from "../useGameSocket";
-import type { GameState } from "../types";
+import type { GameState, ConnectionInfo } from "../types";
 
 export default function LobbyPage() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const [game, setGame] = useState<GameState | null>(null);
+  const [connInfo, setConnInfo] = useState<ConnectionInfo | null>(null);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -25,9 +26,14 @@ export default function LobbyPage() {
     setGame(state);
   }, []);
 
+  const handleConnectionInfo = useCallback((info: ConnectionInfo) => {
+    setConnInfo(info);
+  }, []);
+
   const { connected } = useGameSocket({
     url: notAuthenticated ? null : wsUrl,
     onLobbyUpdate: handleLobbyUpdate,
+    onConnectionInfo: handleConnectionInfo,
   });
 
   // Fetch initial game state
@@ -153,7 +159,7 @@ export default function LobbyPage() {
             key={p.id}
             className={`player-row ${p.id === playerId ? "me" : ""}`}
           >
-            <span className={`conn-dot ${p.connected ? "on" : "off"}`} />
+            <span className={`conn-dot ${connInfo?.connected_players.includes(p.id) ? "on" : p.connected ? "on" : "off"}`} />
             <span className="player-name">
               {p.name}
               {p.is_creator && " ★"}

@@ -507,3 +507,10 @@ input:focus {
 .game-over h2 {
   color: #e74c3c;
 }
+
+/* ===== Spectator / Connection ===== */
+.spectator-count {
+  font-size: 0.75rem;
+  color: #888;
+  margin-left: 0.3rem;
+}

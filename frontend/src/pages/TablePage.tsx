@@ -12,12 +12,13 @@ import {
 } from "../api";
 import { useGameSocket } from "../useGameSocket";
 import { CardList } from "../components/CardDisplay";
-import type { EngineState, GameState } from "../types";
+import type { EngineState, GameState, ConnectionInfo } from "../types";
 
 export default function TablePage() {
   const { code } = useParams<{ code: string }>();
   const [engine, setEngine] = useState<EngineState | null>(null);
   const [lobbyGame, setLobbyGame] = useState<GameState | null>(null);
+  const [connInfo, setConnInfo] = useState<ConnectionInfo | null>(null);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [raiseAmount, setRaiseAmount] = useState(0);
@@ -36,10 +37,15 @@ export default function TablePage() {
     setLobbyGame(state);
   }, []);
 
+  const handleConnectionInfo = useCallback((info: ConnectionInfo) => {
+    setConnInfo(info);
+  }, []);
+
   const { connected } = useGameSocket({
     url: notAuthenticated ? null : wsUrl,
     onEngineUpdate: handleEngineUpdate,
     onLobbyUpdate: handleLobbyUpdate,
+    onConnectionInfo: handleConnectionInfo,
   });
 
   // Fetch initial engine state
@@ -149,6 +155,9 @@ export default function TablePage() {
         </span>
         <span className={`connection-status ${connected ? "online" : "offline"}`}>
           {connected ? "●" : "○"}
+          {connInfo && connInfo.spectator_count > 0 && (
+            <span className="spectator-count"> 👁 {connInfo.spectator_count}</span>
+          )}
         </span>
       </div>
 
@@ -180,6 +189,7 @@ export default function TablePage() {
           const isDealer = p.player_id === engine.dealer_player_id;
           const isAction = p.player_id === engine.action_on;
           const isMe = p.player_id === playerId;
+          const isOnline = connInfo?.connected_players.includes(p.player_id) ?? false;
 
           return (
             <div
@@ -188,6 +198,7 @@ export default function TablePage() {
             >
               <div className="player-top">
                 <span className="player-name">
+                  <span className={`conn-dot ${isOnline ? "on" : "off"}`} />
                   {isDealer && <span className="dealer-btn">D</span>}
                   {p.name}
                   {isMe && " (you)"}

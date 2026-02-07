@@ -19,7 +19,7 @@ from app.models import (
     ReadyRequest,
     StartGameRequest,
 )
-from app.ws_manager import manager
+from app.ws_manager import ClientRole, manager
 
 
 @asynccontextmanager
@@ -169,38 +169,74 @@ async def rebuy(code: str, req: RebuyRequest):
 async def websocket_endpoint(ws: WebSocket, code: str, player_id: str):
     code = code.upper()
 
-    # Validate game and player exist
+    # Validate game exists
     state = await game_manager.get_game_state(code)
     if state is None:
         await ws.close(code=4004, reason="Game not found")
         return
 
+    # Determine role: player or spectator
     player_ids = {p.id for p in state.players}
-    if player_id not in player_ids:
-        await ws.close(code=4003, reason="Player not in game")
-        return
+    if player_id in player_ids:
+        role = ClientRole.PLAYER
+    else:
+        role = ClientRole.SPECTATOR
 
-    await manager.connect(code, player_id, ws)
-    await game_manager.set_player_connected(code, player_id, True)
+    conn = await manager.connect(code, player_id, ws, role)
 
-    # Broadcast updated state (player now connected)
-    state = await game_manager.get_game_state(code)
-    if state:
-        await _broadcast(code, state)
+    if role == ClientRole.PLAYER:
+        await game_manager.set_player_connected(code, player_id, True)
+
+    # Send current state immediately on connect (reconnect support)
+    try:
+        # Lobby state
+        fresh_state = await game_manager.get_game_state(code)
+        if fresh_state:
+            await conn.send(fresh_state.model_dump_json())
+
+        # Engine state (if game is active)
+        if fresh_state and fresh_state.status == "active":
+            try:
+                view = await game_manager.get_engine_state(code, player_id)
+                await conn.send(json.dumps({"type": "game_state", "data": view}))
+            except ValueError:
+                pass  # engine may not exist yet
+
+        # Broadcast connection info to all
+        await _broadcast_connection_info(code)
+    except Exception:
+        pass
 
     try:
         while True:
-            # Keep connection alive; lobby doesn't need client→server messages
-            # but we consume them to detect disconnects
-            await ws.receive_text()
+            raw = await ws.receive_text()
+            # Handle client messages
+            try:
+                msg = json.loads(raw)
+                msg_type = msg.get("type", "")
+
+                if msg_type == "pong":
+                    manager.record_pong(code, player_id)
+                # Future: could handle other client-to-server messages here
+            except (json.JSONDecodeError, AttributeError):
+                pass  # ignore malformed messages
     except WebSocketDisconnect:
         pass
     finally:
-        manager.disconnect(code, player_id)
-        await game_manager.set_player_connected(code, player_id, False)
-        state = await game_manager.get_game_state(code)
-        if state:
-            await _broadcast(code, state)
+        if role == ClientRole.PLAYER:
+            manager.disconnect(code, player_id, conn)
+            await game_manager.set_player_connected(code, player_id, False)
+        else:
+            manager.disconnect_spectator(code, conn)
+
+        # Broadcast updated connection info & lobby state
+        try:
+            fresh_state = await game_manager.get_game_state(code)
+            if fresh_state:
+                await _broadcast(code, fresh_state)
+            await _broadcast_connection_info(code)
+        except Exception:
+            pass
 
 
 # ---------- Helpers ----------
@@ -221,3 +257,27 @@ async def _broadcast_engine_state(code: str) -> None:
             await manager.send_to_player(code, pid, msg)
         except Exception:
             pass  # player may have disconnected
+
+    # Also send a spectator-safe view to spectators (no hole cards)
+    try:
+        # Use a dummy spectator ID to get a view with no personal cards
+        spectator_count = manager.get_spectator_count(code)
+        if spectator_count > 0:
+            # Build a spectator view — load engine, get generic state
+            engine_data = await redis_client.load_engine(code)
+            if engine_data:
+                from app.engine import GameEngine
+                engine = GameEngine.from_dict(engine_data)
+                spec_view = engine.get_player_view("__spectator__")
+                spec_msg = json.dumps({"type": "game_state", "data": spec_view})
+                # Send to all spectator connections
+                for conn in list(manager._spectators.get(code, [])):
+                    await conn.send(spec_msg)
+    except Exception:
+        pass
+
+
+async def _broadcast_connection_info(code: str) -> None:
+    """Send connection info (who's online) to all clients."""
+    info = manager.get_connection_info(code)
+    await manager.broadcast_to_all(code, json.dumps(info))
