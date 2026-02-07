@@ -16,6 +16,7 @@ export interface GameSettings {
   big_blind: number;
   max_players: number;
   allow_rebuys: boolean;
+  turn_timeout: number;
 }
 
 export interface GameState {
@@ -101,6 +102,8 @@ export interface EngineState {
   showdown: boolean;
   my_cards: CardData[];
   valid_actions: ValidAction[];
+  turn_timeout: number;
+  action_deadline: number | null;
 }
 
 /** WebSocket message wrapper. */

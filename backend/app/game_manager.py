@@ -53,6 +53,7 @@ async def create_game(req: CreateGameRequest) -> tuple[str, str, GameState]:
             "big_blind": req.big_blind,
             "max_players": req.max_players,
             "allow_rebuys": req.allow_rebuys,
+            "turn_timeout": req.turn_timeout,
         },
     }
 
@@ -168,6 +169,7 @@ async def start_game(code: str, player_id: str, pin: str) -> GameState:
         small_blind=game_data["settings"]["small_blind"],
         big_blind=game_data["settings"]["big_blind"],
         allow_rebuys=game_data["settings"]["allow_rebuys"],
+        turn_timeout=game_data["settings"].get("turn_timeout", 0),
     )
     engine_state = engine.start_new_hand()
     await redis_client.store_engine(code, engine.to_dict())

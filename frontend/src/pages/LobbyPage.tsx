@@ -148,6 +148,9 @@ export default function LobbyPage() {
         </span>
         <span>Max: {game.settings.max_players} players</span>
         {game.settings.allow_rebuys && <span>Rebuys: On</span>}
+        {game.settings.turn_timeout > 0 && (
+          <span>Timer: {game.settings.turn_timeout}s</span>
+        )}
       </div>
 
       <div className="player-list">

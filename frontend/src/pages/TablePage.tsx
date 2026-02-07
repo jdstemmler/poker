@@ -1,6 +1,6 @@
 /** Game Table Page — main gameplay view. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   buildWsUrl,
@@ -67,6 +67,29 @@ export default function TablePage() {
       setRaiseAmount(raiseAction.min_amount);
     }
   }, [engine?.valid_actions]);
+
+  // Countdown timer
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  useEffect(() => {
+    clearInterval(timerRef.current);
+
+    if (!engine?.action_deadline || !engine.hand_active || engine.turn_timeout === 0) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const tick = () => {
+      const remaining = engine.action_deadline! - Date.now() / 1000;
+      setTimeLeft(Math.max(0, remaining));
+    };
+
+    tick(); // immediate
+    timerRef.current = setInterval(tick, 250);
+
+    return () => clearInterval(timerRef.current);
+  }, [engine?.action_deadline, engine?.hand_active, engine?.turn_timeout]);
 
   if (notAuthenticated) {
     return (
@@ -236,6 +259,19 @@ export default function TablePage() {
 
       {/* Error */}
       {error && <p className="error">{error}</p>}
+
+      {/* Timer Bar */}
+      {engine.hand_active && engine.turn_timeout > 0 && timeLeft !== null && engine.action_on && (
+        <div className="timer-bar-container">
+          <div
+            className={`timer-bar-fill ${timeLeft < 5 ? "urgent" : ""}`}
+            style={{ width: `${Math.min(100, (timeLeft / engine.turn_timeout) * 100)}%` }}
+          />
+          <span className="timer-label">
+            {engine.action_on === playerId ? "Your turn" : ""} {Math.ceil(timeLeft)}s
+          </span>
+        </div>
+      )}
 
       {/* Actions */}
       {isMyTurn && engine.hand_active && (

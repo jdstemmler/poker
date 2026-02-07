@@ -11,6 +11,7 @@ export default function CreateGamePage() {
   const [bigBlind, setBigBlind] = useState(20);
   const [maxPlayers, setMaxPlayers] = useState(9);
   const [allowRebuys, setAllowRebuys] = useState(true);
+  const [turnTimeout, setTurnTimeout] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +28,7 @@ export default function CreateGamePage() {
         big_blind: bigBlind,
         max_players: maxPlayers,
         allow_rebuys: allowRebuys,
+        turn_timeout: turnTimeout,
       });
       // Store credentials in sessionStorage for lobby
       sessionStorage.setItem("playerId", res.player_id);
@@ -119,6 +121,18 @@ export default function CreateGamePage() {
             onChange={(e) => setAllowRebuys(e.target.checked)}
           />
           Allow Rebuys
+        </label>
+
+        <label>
+          Turn Timer (seconds, 0 = off)
+          <input
+            type="number"
+            min={0}
+            max={300}
+            step={5}
+            value={turnTimeout}
+            onChange={(e) => setTurnTimeout(Number(e.target.value))}
+          />
         </label>
 
         {error && <p className="error">{error}</p>}

@@ -20,11 +20,16 @@ from app.models import (
     StartGameRequest,
 )
 from app.ws_manager import ClientRole, manager
+from app.timer import action_timer
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Start action timer background task and inject WS manager
+    action_timer.set_manager(manager)
+    action_timer.start()
     yield
+    action_timer.stop()
     await redis_client.close()
 
 
@@ -87,6 +92,7 @@ async def start_game(code: str, req: StartGameRequest):
     # Broadcast lobby state update, then send engine state to each player
     await _broadcast(code.upper(), state)
     await _broadcast_engine_state(code.upper())
+    await _sync_timer(code.upper())
     return state
 
 
@@ -131,6 +137,7 @@ async def game_action(code: str, req: GameActionRequest):
 
     # Broadcast per-player views via WebSocket
     await _broadcast_engine_state(code.upper())
+    await _sync_timer(code.upper())
     return {"ok": True}
 
 
@@ -145,6 +152,7 @@ async def deal_next_hand(code: str, req: DealHandRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
     await _broadcast_engine_state(code.upper())
+    await _sync_timer(code.upper())
     return {"ok": True}
 
 
@@ -281,3 +289,15 @@ async def _broadcast_connection_info(code: str) -> None:
     """Send connection info (who's online) to all clients."""
     info = manager.get_connection_info(code)
     await manager.broadcast_to_all(code, json.dumps(info))
+
+
+async def _sync_timer(code: str) -> None:
+    """Update the action timer with the current engine's deadline."""
+    try:
+        engine_data = await redis_client.load_engine(code)
+        if engine_data and engine_data.get("action_deadline"):
+            action_timer.set_deadline(code, engine_data["action_deadline"])
+        else:
+            action_timer.clear(code)
+    except Exception:
+        pass

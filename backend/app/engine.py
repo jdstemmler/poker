@@ -6,6 +6,7 @@ pot management, showdown, dealer rotation, and hand lifecycle.
 
 from __future__ import annotations
 
+import time
 from enum import Enum
 from typing import Any, Optional
 
@@ -124,12 +125,14 @@ class GameEngine:
         small_blind: int,
         big_blind: int,
         allow_rebuys: bool = True,
+        turn_timeout: int = 0,
     ) -> None:
         self.game_code = game_code
         self.small_blind = small_blind
         self.big_blind = big_blind
         self.allow_rebuys = allow_rebuys
         self.starting_chips = starting_chips
+        self.turn_timeout = turn_timeout  # 0 = no timer
 
         # Seat players in order
         self.seats: list[PlayerState] = []
@@ -151,6 +154,7 @@ class GameEngine:
         self.min_raise: int = big_blind
         self.hand_active: bool = False
         self.last_raiser_idx: Optional[int] = None
+        self.action_deadline: Optional[float] = None  # Unix timestamp when turn expires
 
         # History
         self.hand_histories: list[HandHistory] = []
@@ -200,6 +204,13 @@ class GameEngine:
             if not p.folded:
                 return i
         return idx  # shouldn't happen
+
+    def _set_action_deadline(self) -> None:
+        """Set the action deadline for the current player based on turn_timeout."""
+        if self.turn_timeout > 0 and self.hand_active:
+            self.action_deadline = time.time() + self.turn_timeout
+        else:
+            self.action_deadline = None
 
     # ------------------------------------------------------------------
     # Hand Lifecycle
@@ -272,6 +283,7 @@ class GameEngine:
 
         # Action starts after big blind
         self.action_on_idx = self._next_seat(bb_idx)
+        self._set_action_deadline()
 
         # In preflop, the big blind acts last (gets option to raise)
         self.last_raiser_idx = bb_idx
@@ -386,6 +398,7 @@ class GameEngine:
 
         # Move to next player
         self.action_on_idx = self._next_seat(idx, only_active=True)
+        self._set_action_deadline()
         return self._build_state()
 
     def _do_fold(self, idx: int) -> None:
@@ -568,6 +581,7 @@ class GameEngine:
                 self.dealer_idx, only_active=True
             )
 
+        self._set_action_deadline()
         return self._build_state()
 
     # ------------------------------------------------------------------
@@ -631,6 +645,7 @@ class GameEngine:
 
         self.pot = 0
         self.hand_active = False
+        self.action_deadline = None
 
         return self._build_state(showdown=True)
 
@@ -660,6 +675,7 @@ class GameEngine:
 
         self.pot = 0
         self.hand_active = False
+        self.action_deadline = None
 
         return self._build_state(showdown=False)
 
@@ -731,6 +747,8 @@ class GameEngine:
             ],
             # Showdown reveals all non-folded cards
             "showdown": showdown,
+            "turn_timeout": self.turn_timeout,
+            "action_deadline": self.action_deadline,
         }
 
     def get_player_view(self, player_id: str) -> dict[str, Any]:
@@ -768,6 +786,7 @@ class GameEngine:
             "big_blind": self.big_blind,
             "allow_rebuys": self.allow_rebuys,
             "starting_chips": self.starting_chips,
+            "turn_timeout": self.turn_timeout,
             "dealer_idx": self.dealer_idx,
             "hand_number": self.hand_number,
             "street": self.street.value,
@@ -777,6 +796,7 @@ class GameEngine:
             "hand_active": self.hand_active,
             "action_on_idx": self.action_on_idx,
             "last_raiser_idx": self.last_raiser_idx,
+            "action_deadline": self.action_deadline,
             "community_cards": [c.to_dict() for c in self.community_cards],
             "last_hand_result": self.last_hand_result,
             "seats": [
@@ -806,6 +826,7 @@ class GameEngine:
         engine.big_blind = data["big_blind"]
         engine.allow_rebuys = data["allow_rebuys"]
         engine.starting_chips = data["starting_chips"]
+        engine.turn_timeout = data.get("turn_timeout", 0)
         engine.dealer_idx = data["dealer_idx"]
         engine.hand_number = data["hand_number"]
         engine.street = Street(data["street"])
@@ -815,6 +836,7 @@ class GameEngine:
         engine.hand_active = data["hand_active"]
         engine.action_on_idx = data["action_on_idx"]
         engine.last_raiser_idx = data["last_raiser_idx"]
+        engine.action_deadline = data.get("action_deadline")
         engine.community_cards = [Card.from_dict(c) for c in data["community_cards"]]
         engine.last_hand_result = data.get("last_hand_result")
         engine.deck = None  # Deck is not persisted (new one each hand)
