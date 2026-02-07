@@ -44,5 +44,16 @@ class ConnectionManager:
             return set()
         return set(self._connections[code].keys())
 
+    async def send_to_player(self, code: str, player_id: str, message: str) -> None:
+        """Send a message to a specific player."""
+        if code not in self._connections:
+            return
+        ws = self._connections[code].get(player_id)
+        if ws:
+            try:
+                await ws.send_text(message)
+            except Exception:
+                self.disconnect(code, player_id)
+
 
 manager = ConnectionManager()

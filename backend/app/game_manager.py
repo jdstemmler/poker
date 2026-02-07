@@ -1,4 +1,4 @@
-"""Game manager — business logic for lobby operations."""
+"""Game manager — business logic for lobby and gameplay operations."""
 
 from __future__ import annotations
 
@@ -6,9 +6,10 @@ import hashlib
 import random
 import string
 import uuid
-from typing import Optional
+from typing import Any, Optional
 
 from app import redis_client
+from app.engine import GameEngine
 from app.models import (
     CreateGameRequest,
     GameSettings,
@@ -133,7 +134,7 @@ async def toggle_ready(code: str, player_id: str, pin: str) -> GameState:
 
 
 async def start_game(code: str, player_id: str, pin: str) -> GameState:
-    """Start the game (creator only, all must be ready, min 4 players)."""
+    """Start the game (creator only, all must be ready, min 2 players)."""
     game_data = await redis_client.load_game(code)
     if game_data is None:
         raise ValueError("Game not found")
@@ -158,6 +159,18 @@ async def start_game(code: str, player_id: str, pin: str) -> GameState:
 
     game_data["status"] = GameStatus.ACTIVE.value
     await redis_client.store_game(code, game_data)
+
+    # Create and persist the game engine
+    engine = GameEngine(
+        game_code=code,
+        players=[{"id": p["id"], "name": p["name"]} for p in players],
+        starting_chips=game_data["settings"]["starting_chips"],
+        small_blind=game_data["settings"]["small_blind"],
+        big_blind=game_data["settings"]["big_blind"],
+        allow_rebuys=game_data["settings"]["allow_rebuys"],
+    )
+    engine_state = engine.start_new_hand()
+    await redis_client.store_engine(code, engine.to_dict())
 
     return await _build_game_state(code, game_data)
 
@@ -202,3 +215,80 @@ async def _build_game_state(
         players=players,
         creator_id=game_data["creator_id"],
     )
+
+
+# ------------------------------------------------------------------
+# Engine Operations (Phase 2)
+# ------------------------------------------------------------------
+
+
+async def _load_engine(code: str) -> GameEngine:
+    """Load game engine from Redis."""
+    engine_data = await redis_client.load_engine(code)
+    if engine_data is None:
+        raise ValueError("Game engine not found")
+    return GameEngine.from_dict(engine_data)
+
+
+async def _save_engine(code: str, engine: GameEngine) -> None:
+    """Persist game engine to Redis."""
+    await redis_client.store_engine(code, engine.to_dict())
+
+
+async def verify_player(code: str, player_id: str, pin: str) -> None:
+    """Verify a player's PIN for authenticated actions."""
+    player_data = await redis_client.load_player(code, player_id)
+    if player_data is None:
+        raise ValueError("Player not found")
+    if not _verify_pin(pin, player_data["pin_hash"]):
+        raise ValueError("Invalid PIN")
+
+
+async def get_engine_state(code: str, player_id: str) -> dict[str, Any]:
+    """Get the game engine state for a specific player."""
+    engine = await _load_engine(code)
+    return engine.get_player_view(player_id)
+
+
+async def process_action(
+    code: str, player_id: str, pin: str, action: str, amount: int = 0
+) -> dict[str, Any]:
+    """Process a player's game action."""
+    await verify_player(code, player_id, pin)
+
+    engine = await _load_engine(code)
+    result = engine.process_action(player_id, action, amount)
+    await _save_engine(code, engine)
+
+    return result
+
+
+async def deal_next_hand(code: str, player_id: str, pin: str) -> dict[str, Any]:
+    """Deal the next hand (creator only, after previous hand ended)."""
+    game_data = await redis_client.load_game(code)
+    if game_data is None:
+        raise ValueError("Game not found")
+    if game_data["creator_id"] != player_id:
+        raise ValueError("Only the creator can deal the next hand")
+
+    await verify_player(code, player_id, pin)
+
+    engine = await _load_engine(code)
+    if engine.hand_active:
+        raise ValueError("Current hand is still in progress")
+
+    result = engine.start_new_hand()
+    await _save_engine(code, engine)
+
+    return result
+
+
+async def request_rebuy(code: str, player_id: str, pin: str) -> dict[str, Any]:
+    """Handle a rebuy request."""
+    await verify_player(code, player_id, pin)
+
+    engine = await _load_engine(code)
+    result = engine.rebuy(player_id)
+    await _save_engine(code, engine)
+
+    return result

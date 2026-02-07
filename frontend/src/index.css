@@ -276,3 +276,234 @@ input:focus {
   text-align: center;
   margin-top: 0.5rem;
 }
+
+/* ===== Game Table (Phase 2) ===== */
+.table-page {
+  gap: 0.75rem;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.table-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.street-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: #4ecca3;
+  letter-spacing: 0.1em;
+}
+
+.pot-label {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #f1c40f;
+}
+
+/* Cards */
+.community-cards {
+  text-align: center;
+  padding: 0.5rem 0;
+  min-height: 2.5rem;
+}
+
+.my-cards {
+  text-align: center;
+  padding: 0.25rem 0;
+  font-size: 1.3rem;
+}
+
+.card-display {
+  display: inline-block;
+  background: #16213e;
+  border: 1px solid #393e6e;
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  margin: 0 0.15rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  font-family: monospace;
+}
+
+.card-back {
+  color: #555;
+}
+
+.card-list {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+/* Table Player Rows */
+.table-player {
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.table-player.action-on {
+  border-color: #f1c40f;
+  box-shadow: 0 0 6px #f1c40f44;
+}
+
+.table-player.folded {
+  opacity: 0.5;
+}
+
+.player-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.player-chips {
+  font-weight: 600;
+  color: #f1c40f;
+  font-size: 0.9rem;
+}
+
+.player-bottom {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.dealer-btn {
+  display: inline-block;
+  background: #f1c40f;
+  color: #1a1a2e;
+  font-weight: 700;
+  font-size: 0.65rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  line-height: 1.2rem;
+  text-align: center;
+  border-radius: 50%;
+  margin-right: 0.3rem;
+}
+
+.status-tag {
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.folded-tag {
+  background: #e74c3c22;
+  color: #e74c3c;
+}
+
+.allin-tag {
+  background: #f39c1233;
+  color: #f39c12;
+}
+
+.sit-tag {
+  background: #55555533;
+  color: #888;
+}
+
+.bet-tag {
+  background: #3498db22;
+  color: #3498db;
+}
+
+/* Hand Result */
+.hand-result {
+  background: #16213e;
+  border: 1px solid #393e6e;
+  border-radius: 6px;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.hand-result h3 {
+  font-size: 0.9rem;
+  color: #4ecca3;
+  margin-bottom: 0.25rem;
+}
+
+.hand-result p {
+  font-size: 0.85rem;
+  color: #ccc;
+}
+
+/* Action Bar */
+.action-bar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+}
+
+.action-bar .btn {
+  flex: 1;
+  min-width: 4rem;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.btn-fold {
+  background: #e74c3c;
+  color: #fff;
+}
+
+.btn-check {
+  background: #2ecc71;
+  color: #1a1a2e;
+}
+
+.btn-call {
+  background: #3498db;
+  color: #fff;
+}
+
+.btn-raise {
+  background: #f39c12;
+  color: #1a1a2e;
+}
+
+.btn-allin {
+  background: #e74c3c;
+  color: #fff;
+}
+
+.raise-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 2;
+  min-width: 8rem;
+}
+
+.raise-slider {
+  width: 100%;
+  accent-color: #f39c12;
+}
+
+/* Between Hands */
+.between-hands {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.game-over {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.game-over h2 {
+  color: #e74c3c;
+}

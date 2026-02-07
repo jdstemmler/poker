@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { buildWsUrl, getGame, toggleReady, startGame } from "../api";
 import { useGameSocket } from "../useGameSocket";
 import type { GameState } from "../types";
 
 export default function LobbyPage() {
   const { code } = useParams<{ code: string }>();
+  const navigate = useNavigate();
   const [game, setGame] = useState<GameState | null>(null);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -20,13 +21,13 @@ export default function LobbyPage() {
   const wsUrl =
     code && playerId ? buildWsUrl(code, playerId) : null;
 
-  const handleStateUpdate = useCallback((state: GameState) => {
+  const handleLobbyUpdate = useCallback((state: GameState) => {
     setGame(state);
   }, []);
 
   const { connected } = useGameSocket({
     url: notAuthenticated ? null : wsUrl,
-    onStateUpdate: handleStateUpdate,
+    onLobbyUpdate: handleLobbyUpdate,
   });
 
   // Fetch initial game state
@@ -36,6 +37,13 @@ export default function LobbyPage() {
       .then(setGame)
       .catch((e) => setError(e.message));
   }, [code]);
+
+  // Redirect to table when game becomes active
+  useEffect(() => {
+    if (game?.status === "active" && code) {
+      navigate(`/game/${code}/table`);
+    }
+  }, [game?.status, code, navigate]);
 
   if (notAuthenticated) {
     return (

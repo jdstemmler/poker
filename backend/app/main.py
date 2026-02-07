@@ -1,11 +1,13 @@
-"""FastAPI application — REST + WebSocket endpoints for the poker lobby."""
+"""FastAPI application — REST + WebSocket endpoints for poker."""
 
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from app import game_manager, redis_client
 from app.models import (
@@ -82,8 +84,82 @@ async def start_game(code: str, req: StartGameRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    # Broadcast lobby state update, then send engine state to each player
     await _broadcast(code.upper(), state)
+    await _broadcast_engine_state(code.upper())
     return state
+
+
+# ---------- Game Engine Endpoints (Phase 2) ----------
+
+
+class GameActionRequest(BaseModel):
+    player_id: str
+    pin: str = Field(..., pattern=r"^\d{4}$")
+    action: str  # fold, check, call, raise, all_in
+    amount: int = 0
+
+
+class DealHandRequest(BaseModel):
+    player_id: str
+    pin: str = Field(..., pattern=r"^\d{4}$")
+
+
+class RebuyRequest(BaseModel):
+    player_id: str
+    pin: str = Field(..., pattern=r"^\d{4}$")
+
+
+@app.get("/api/games/{code}/state/{player_id}")
+async def get_engine_state(code: str, player_id: str):
+    """Get the game engine state for a specific player (their view)."""
+    try:
+        return await game_manager.get_engine_state(code.upper(), player_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/games/{code}/action")
+async def game_action(code: str, req: GameActionRequest):
+    """Process a player's game action (fold, check, call, raise, all_in)."""
+    try:
+        result = await game_manager.process_action(
+            code.upper(), req.player_id, req.pin, req.action, req.amount
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Broadcast per-player views via WebSocket
+    await _broadcast_engine_state(code.upper())
+    return {"ok": True}
+
+
+@app.post("/api/games/{code}/deal")
+async def deal_next_hand(code: str, req: DealHandRequest):
+    """Deal the next hand (creator only)."""
+    try:
+        result = await game_manager.deal_next_hand(
+            code.upper(), req.player_id, req.pin
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await _broadcast_engine_state(code.upper())
+    return {"ok": True}
+
+
+@app.post("/api/games/{code}/rebuy")
+async def rebuy(code: str, req: RebuyRequest):
+    """Request a rebuy."""
+    try:
+        result = await game_manager.request_rebuy(
+            code.upper(), req.player_id, req.pin
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await _broadcast_engine_state(code.upper())
+    return {"ok": True}
 
 
 # ---------- WebSocket ----------
@@ -131,4 +207,17 @@ async def websocket_endpoint(ws: WebSocket, code: str, player_id: str):
 
 
 async def _broadcast(code: str, state):
+    """Broadcast lobby state to all connected clients."""
     await manager.broadcast_game_state(code, state.model_dump_json())
+
+
+async def _broadcast_engine_state(code: str) -> None:
+    """Send per-player game engine view to each connected WebSocket client."""
+    connected_ids = manager.get_connected_player_ids(code)
+    for pid in connected_ids:
+        try:
+            view = await game_manager.get_engine_state(code, pid)
+            msg = json.dumps({"type": "game_state", "data": view})
+            await manager.send_to_player(code, pid, msg)
+        except Exception:
+            pass  # player may have disconnected

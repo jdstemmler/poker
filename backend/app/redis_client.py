@@ -70,11 +70,28 @@ async def load_all_players(code: str) -> list[dict[str, Any]]:
     return players
 
 
+def _engine_key(code: str) -> str:
+    return f"game:{code}:engine"
+
+
+async def store_engine(code: str, data: dict[str, Any]) -> None:
+    r = await get_redis()
+    await r.set(_engine_key(code), json.dumps(data))
+
+
+async def load_engine(code: str) -> Optional[dict[str, Any]]:
+    r = await get_redis()
+    raw = await r.get(_engine_key(code))
+    if raw is None:
+        return None
+    return json.loads(raw)
+
+
 async def delete_game(code: str) -> None:
     """Clean up all keys for a game (for future use)."""
     r = await get_redis()
     player_ids = await r.smembers(_players_key(code))
-    keys = [_game_key(code), _players_key(code)]
+    keys = [_game_key(code), _players_key(code), _engine_key(code)]
     for pid in player_ids:
         keys.append(_player_key(code, pid))
     if keys:
