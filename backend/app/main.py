@@ -21,6 +21,7 @@ from app.models import (
 )
 from app.ws_manager import ClientRole, manager
 from app.timer import action_timer
+from app.cleanup import game_cleaner, cleanup_stale_games
 
 
 @asynccontextmanager
@@ -28,7 +29,10 @@ async def lifespan(app: FastAPI):
     # Start action timer background task and inject WS manager
     action_timer.set_manager(manager)
     action_timer.start()
+    # Start stale-game cleanup background task
+    game_cleaner.start()
     yield
+    game_cleaner.stop()
     action_timer.stop()
     await redis_client.close()
 
@@ -187,6 +191,13 @@ async def show_cards(code: str, req: ShowCardsRequest):
 
     await _broadcast_engine_state(code.upper())
     return {"ok": True}
+
+
+@app.post("/api/admin/cleanup")
+async def admin_cleanup():
+    """Manually trigger stale-game cleanup. Returns deleted and kept game codes."""
+    result = await cleanup_stale_games()
+    return result
 
 
 # ---------- WebSocket ----------

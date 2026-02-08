@@ -68,6 +68,7 @@ async def create_game(req: CreateGameRequest) -> tuple[str, str, GameState]:
 
     await redis_client.store_game(code, game_data)
     await redis_client.store_player(code, player_id, player_data)
+    await redis_client.touch_activity(code)
 
     state = await _build_game_state(code, game_data)
     return code, player_id, state
@@ -109,6 +110,7 @@ async def join_game(code: str, req: JoinGameRequest) -> tuple[str, GameState]:
     }
 
     await redis_client.store_player(code, player_id, player_data)
+    await redis_client.touch_activity(code)
 
     state = await _build_game_state(code, game_data)
     return player_id, state
@@ -173,6 +175,7 @@ async def start_game(code: str, player_id: str, pin: str) -> GameState:
     )
     engine_state = engine.start_new_hand()
     await redis_client.store_engine(code, engine.to_dict())
+    await redis_client.touch_activity(code)
 
     return await _build_game_state(code, game_data)
 
@@ -261,6 +264,7 @@ async def process_action(
     engine = await _load_engine(code)
     result = engine.process_action(player_id, action, amount)
     await _save_engine(code, engine)
+    await redis_client.touch_activity(code)
 
     return result
 
@@ -279,6 +283,7 @@ async def deal_next_hand(code: str, player_id: str, pin: str) -> dict[str, Any]:
 
     result = engine.start_new_hand()
     await _save_engine(code, engine)
+    await redis_client.touch_activity(code)
 
     return result
 
@@ -290,6 +295,7 @@ async def request_rebuy(code: str, player_id: str, pin: str) -> dict[str, Any]:
     engine = await _load_engine(code)
     result = engine.rebuy(player_id)
     await _save_engine(code, engine)
+    await redis_client.touch_activity(code)
 
     return result
 

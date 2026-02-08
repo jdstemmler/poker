@@ -87,11 +87,49 @@ async def load_engine(code: str) -> Optional[dict[str, Any]]:
     return json.loads(raw)
 
 
+def _activity_key(code: str) -> str:
+    return f"game:{code}:last_activity"
+
+
+async def touch_activity(code: str) -> None:
+    """Update the last-activity timestamp for a game (Unix epoch seconds)."""
+    import time
+
+    r = await get_redis()
+    await r.set(_activity_key(code), str(time.time()))
+
+
+async def get_last_activity(code: str) -> float | None:
+    """Return the last-activity timestamp for a game, or None."""
+    r = await get_redis()
+    raw = await r.get(_activity_key(code))
+    if raw is None:
+        return None
+    return float(raw)
+
+
+async def list_all_game_codes() -> list[str]:
+    """Return all game codes currently stored in Redis."""
+    r = await get_redis()
+    codes: set[str] = set()
+    async for key in r.scan_iter(match="game:*", count=200):
+        # Keys look like game:ABCD12, game:ABCD12:players, etc.
+        parts = key.split(":")
+        if len(parts) >= 2:
+            codes.add(parts[1])
+    return list(codes)
+
+
 async def delete_game(code: str) -> None:
-    """Clean up all keys for a game (for future use)."""
+    """Clean up all keys for a game."""
     r = await get_redis()
     player_ids = await r.smembers(_players_key(code))
-    keys = [_game_key(code), _players_key(code), _engine_key(code)]
+    keys = [
+        _game_key(code),
+        _players_key(code),
+        _engine_key(code),
+        _activity_key(code),
+    ]
     for pid in player_ids:
         keys.append(_player_key(code, pid))
     if keys:
