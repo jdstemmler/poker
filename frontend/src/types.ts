@@ -106,6 +106,7 @@ export interface EngineState {
   valid_actions: ValidAction[];
   turn_timeout: number;
   action_deadline: number | null;
+  auto_deal_deadline: number | null;
 }
 
 /** WebSocket message wrapper. */

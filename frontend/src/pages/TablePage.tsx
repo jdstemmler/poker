@@ -18,7 +18,7 @@ import type { EngineState, GameState, ConnectionInfo } from "../types";
 export default function TablePage() {
   const { code } = useParams<{ code: string }>();
   const [engine, setEngine] = useState<EngineState | null>(null);
-  const [lobbyGame, setLobbyGame] = useState<GameState | null>(null);
+  const [, setLobbyGame] = useState<GameState | null>(null);
   const [connInfo, setConnInfo] = useState<ConnectionInfo | null>(null);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -114,6 +114,29 @@ export default function TablePage() {
     return () => clearInterval(timerRef.current);
   }, [engine?.action_deadline, engine?.hand_active, engine?.turn_timeout]);
 
+  // Auto-deal countdown
+  const [dealTimeLeft, setDealTimeLeft] = useState<number | null>(null);
+  const dealTimerRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  useEffect(() => {
+    clearInterval(dealTimerRef.current);
+
+    if (!engine?.auto_deal_deadline || engine.hand_active) {
+      setDealTimeLeft(null);
+      return;
+    }
+
+    const tick = () => {
+      const remaining = engine.auto_deal_deadline! - Date.now() / 1000;
+      setDealTimeLeft(Math.max(0, remaining));
+    };
+
+    tick();
+    dealTimerRef.current = setInterval(tick, 250);
+
+    return () => clearInterval(dealTimerRef.current);
+  }, [engine?.auto_deal_deadline, engine?.hand_active]);
+
   if (notAuthenticated) {
     return (
       <div className="page">
@@ -139,7 +162,6 @@ export default function TablePage() {
     );
   }
 
-  const isCreator = lobbyGame?.creator_id === playerId;
   const me = engine.players.find((p) => p.player_id === playerId);
   const isMyTurn = engine.action_on === playerId;
 
@@ -437,11 +459,9 @@ export default function TablePage() {
         {/* Between hands */}
         {!engine.hand_active && !engine.game_over && (
           <div className="between-hands">
-            {isCreator && (
-              <button className="btn btn-deal" onClick={doDeal} disabled={actionLoading}>
-                Deal Next Hand
-              </button>
-            )}
+            <button className="btn btn-deal" onClick={doDeal} disabled={actionLoading}>
+              Deal Now{dealTimeLeft !== null ? ` (${Math.ceil(dealTimeLeft)}s)` : ""}
+            </button>
             {me && me.chips === 0 && (
               <button className="btn btn-rebuy" onClick={doRebuy} disabled={actionLoading}>
                 Rebuy

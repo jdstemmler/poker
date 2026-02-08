@@ -158,6 +158,10 @@ class GameEngine:
         self.hand_active: bool = False
         self.last_raiser_idx: Optional[int] = None
         self.action_deadline: Optional[float] = None  # Unix timestamp when turn expires
+        self.auto_deal_deadline: Optional[float] = None  # Unix timestamp for auto-deal
+
+        # Auto-deal delay in seconds (0 = disabled)
+        self.auto_deal_delay: int = 10
 
         # History
         self.hand_histories: list[HandHistory] = []
@@ -218,6 +222,13 @@ class GameEngine:
         else:
             self.action_deadline = None
 
+    def _set_auto_deal_deadline(self) -> None:
+        """Set the auto-deal deadline after a hand ends."""
+        if self.auto_deal_delay > 0 and not self.hand_active:
+            self.auto_deal_deadline = time.time() + self.auto_deal_delay
+        else:
+            self.auto_deal_deadline = None
+
     # ------------------------------------------------------------------
     # Hand Lifecycle
     # ------------------------------------------------------------------
@@ -238,6 +249,9 @@ class GameEngine:
 
         self.hand_number += 1
         self.last_hand_result = None
+
+        # Clear auto-deal deadline
+        self.auto_deal_deadline = None
 
         # Reset shown cards for new hand
         self.shown_cards = set()
@@ -664,6 +678,8 @@ class GameEngine:
         self.hand_active = False
         self.action_deadline = None
 
+        self._set_auto_deal_deadline()
+
         return self._build_state(showdown=True)
 
     def _award_pot_to_last_player(self, winner_idx: int) -> dict[str, Any]:
@@ -693,6 +709,8 @@ class GameEngine:
         self.pot = 0
         self.hand_active = False
         self.action_deadline = None
+
+        self._set_auto_deal_deadline()
 
         return self._build_state(showdown=False)
 
@@ -781,6 +799,7 @@ class GameEngine:
             "showdown": showdown,
             "turn_timeout": self.turn_timeout,
             "action_deadline": self.action_deadline,
+            "auto_deal_deadline": self.auto_deal_deadline,
         }
 
     def get_player_view(self, player_id: str) -> dict[str, Any]:
@@ -853,6 +872,8 @@ class GameEngine:
             "action_on_idx": self.action_on_idx,
             "last_raiser_idx": self.last_raiser_idx,
             "action_deadline": self.action_deadline,
+            "auto_deal_deadline": self.auto_deal_deadline,
+            "auto_deal_delay": self.auto_deal_delay,
             "community_cards": [c.to_dict() for c in self.community_cards],
             "deck": self.deck.to_dict() if self.deck else None,
             "last_hand_result": self.last_hand_result,
@@ -896,6 +917,8 @@ class GameEngine:
         engine.action_on_idx = data["action_on_idx"]
         engine.last_raiser_idx = data["last_raiser_idx"]
         engine.action_deadline = data.get("action_deadline")
+        engine.auto_deal_deadline = data.get("auto_deal_deadline")
+        engine.auto_deal_delay = data.get("auto_deal_delay", 10)
         engine.community_cards = [Card.from_dict(c) for c in data["community_cards"]]
         engine.last_hand_result = data.get("last_hand_result")
         deck_data = data.get("deck")

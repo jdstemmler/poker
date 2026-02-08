@@ -143,7 +143,7 @@ async def game_action(code: str, req: GameActionRequest):
 
 @app.post("/api/games/{code}/deal")
 async def deal_next_hand(code: str, req: DealHandRequest):
-    """Deal the next hand (creator only)."""
+    """Deal the next hand (any player can trigger)."""
     try:
         result = await game_manager.deal_next_hand(
             code.upper(), req.player_id, req.pin
@@ -318,5 +318,11 @@ async def _sync_timer(code: str) -> None:
             action_timer.set_deadline(code, engine_data["action_deadline"])
         else:
             action_timer.clear(code)
+
+        # Sync auto-deal deadline
+        if engine_data and engine_data.get("auto_deal_deadline"):
+            action_timer.set_auto_deal_deadline(code, engine_data["auto_deal_deadline"])
+        else:
+            action_timer.clear_auto_deal(code)
     except Exception:
         pass

@@ -266,12 +266,10 @@ async def process_action(
 
 
 async def deal_next_hand(code: str, player_id: str, pin: str) -> dict[str, Any]:
-    """Deal the next hand (creator only, after previous hand ended)."""
+    """Deal the next hand (any player can trigger)."""
     game_data = await redis_client.load_game(code)
     if game_data is None:
         raise ValueError("Game not found")
-    if game_data["creator_id"] != player_id:
-        raise ValueError("Only the creator can deal the next hand")
 
     await verify_player(code, player_id, pin)
 

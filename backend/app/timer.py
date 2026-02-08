@@ -21,12 +21,14 @@ TICK_INTERVAL = 1.0
 
 
 class ActionTimer:
-    """Manages per-game action timers using a single asyncio background loop."""
+    """Manages per-game action timers and auto-deal using a single asyncio background loop."""
 
     def __init__(self) -> None:
         self._task: asyncio.Task | None = None
         # game_code -> deadline (Unix timestamp)
         self._deadlines: dict[str, float] = {}
+        # game_code -> auto-deal deadline (Unix timestamp)
+        self._auto_deal_deadlines: dict[str, float] = {}
         self._manager: ConnectionManager | None = None
 
     def set_manager(self, manager: "ConnectionManager") -> None:
@@ -55,6 +57,16 @@ class ActionTimer:
     def clear(self, code: str) -> None:
         self._deadlines.pop(code, None)
 
+    def set_auto_deal_deadline(self, code: str, deadline: float | None) -> None:
+        """Register (or clear) the auto-deal deadline for a game."""
+        if deadline is None or deadline <= 0:
+            self._auto_deal_deadlines.pop(code, None)
+        else:
+            self._auto_deal_deadlines[code] = deadline
+
+    def clear_auto_deal(self, code: str) -> None:
+        self._auto_deal_deadlines.pop(code, None)
+
     async def _loop(self) -> None:
         """Main timer loop — checks all tracked deadlines each tick."""
         try:
@@ -62,7 +74,7 @@ class ActionTimer:
                 await asyncio.sleep(TICK_INTERVAL)
                 now = time.time()
 
-                # Snapshot keys to avoid mutation during iteration
+                # Action timeouts
                 expired = [
                     (code, dl)
                     for code, dl in list(self._deadlines.items())
@@ -75,6 +87,20 @@ class ActionTimer:
                         await self._handle_timeout(code)
                     except Exception:
                         logger.exception("Timer error for game %s", code)
+
+                # Auto-deal deadlines
+                expired_deals = [
+                    (code, dl)
+                    for code, dl in list(self._auto_deal_deadlines.items())
+                    if now >= dl
+                ]
+
+                for code, _dl in expired_deals:
+                    self._auto_deal_deadlines.pop(code, None)
+                    try:
+                        await self._handle_auto_deal(code)
+                    except Exception:
+                        logger.exception("Auto-deal error for game %s", code)
         except asyncio.CancelledError:
             pass
 
@@ -124,6 +150,41 @@ class ActionTimer:
             self._deadlines[code] = engine.action_deadline
 
         # Broadcast updated state to all players
+        await self._broadcast_engine_state(code, engine)
+
+    async def _handle_auto_deal(self, code: str) -> None:
+        """Auto-deal the next hand when the auto-deal deadline expires."""
+        engine_data = await redis_client.load_engine(code)
+        if engine_data is None:
+            return
+
+        engine = GameEngine.from_dict(engine_data)
+
+        if engine.hand_active:
+            return  # Hand already in progress (someone dealt manually)
+
+        if engine.auto_deal_deadline is None:
+            return  # Auto-deal was cancelled
+
+        if time.time() < engine.auto_deal_deadline:
+            # Deadline was reset — re-register
+            self._auto_deal_deadlines[code] = engine.auto_deal_deadline
+            return
+
+        # Check enough players to continue
+        live_players = [p for p in engine.seats if not p.is_sitting_out]
+        if len(live_players) < 2:
+            return
+
+        logger.info("Auto-deal: game=%s hand=%d", code, engine.hand_number + 1)
+
+        engine.start_new_hand()
+        await redis_client.store_engine(code, engine.to_dict())
+
+        # Register next action deadline if hand started with a timer
+        if engine.hand_active and engine.action_deadline:
+            self._deadlines[code] = engine.action_deadline
+
         await self._broadcast_engine_state(code, engine)
 
     async def _broadcast_engine_state(self, code: str, engine: GameEngine) -> None:
