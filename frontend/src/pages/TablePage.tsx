@@ -389,9 +389,9 @@ export default function TablePage() {
               <>
                 <div className="table-menu-backdrop" onClick={() => setMenuOpen(false)} />
                 <div className="table-menu-dropdown">
-                  <Link to="/" className="table-menu-item" onClick={() => setMenuOpen(false)}>🏠 Home</Link>
-                  <Link to="/create" className="table-menu-item" onClick={() => setMenuOpen(false)}>🃏 Create Game</Link>
-                  <Link to="/join" className="table-menu-item" onClick={() => setMenuOpen(false)}>🚪 Join Game</Link>
+                  <Link to="/" className="table-menu-item" onClick={() => setMenuOpen(false)}>Home</Link>
+                  <Link to="/create" className="table-menu-item" onClick={() => setMenuOpen(false)}>Create Game</Link>
+                  <Link to="/join" className="table-menu-item" onClick={() => setMenuOpen(false)}>Join Game</Link>
                 </div>
               </>
             )}

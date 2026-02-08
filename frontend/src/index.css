@@ -868,6 +868,7 @@ input::placeholder {
   font-weight: 500;
   color: var(--text);
   text-decoration: none;
+  white-space: nowrap;
   transition: background 0.1s;
 }
 
