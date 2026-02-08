@@ -22,6 +22,7 @@ export default function TablePage() {
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [raiseAmount, setRaiseAmount] = useState(0);
+  const [showRaisePanel, setShowRaisePanel] = useState(false);
 
   const playerId = sessionStorage.getItem("playerId");
   const playerPin = sessionStorage.getItem("playerPin");
@@ -66,7 +67,11 @@ export default function TablePage() {
     if (raiseAction?.min_amount) {
       setRaiseAmount(raiseAction.min_amount);
     }
-  }, [engine?.valid_actions]);
+    // Close raise panel when it's no longer our turn
+    if (engine.action_on !== playerId) {
+      setShowRaisePanel(false);
+    }
+  }, [engine?.valid_actions, engine?.action_on, playerId]);
 
   // Countdown timer
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -85,7 +90,7 @@ export default function TablePage() {
       setTimeLeft(Math.max(0, remaining));
     };
 
-    tick(); // immediate
+    tick();
     timerRef.current = setInterval(tick, 250);
 
     return () => clearInterval(timerRef.current);
@@ -111,7 +116,9 @@ export default function TablePage() {
   }
 
   if (!engine) {
-    return <div className="page"><p>Loading game…</p></div>;
+    return (
+      <div className="page"><div className="loading-spinner" /><p>Loading game…</p></div>
+    );
   }
 
   const isCreator = lobbyGame?.creator_id === playerId;
@@ -122,6 +129,7 @@ export default function TablePage() {
     if (!code || !playerId || !playerPin) return;
     setActionLoading(true);
     setError("");
+    setShowRaisePanel(false);
     try {
       await sendAction(code, {
         player_id: playerId,
@@ -169,96 +177,32 @@ export default function TablePage() {
   const raiseAction = engine.valid_actions.find((a) => a.action === "raise");
   const allInAction = engine.valid_actions.find((a) => a.action === "all_in");
 
+  // Raise presets
+  const raisePresets = raiseAction ? [
+    { label: "Min", value: raiseAction.min_amount ?? 0 },
+    { label: "½ Pot", value: Math.min(Math.max(Math.floor(engine.pot / 2), raiseAction.min_amount ?? 0), raiseAction.max_amount ?? 0) },
+    { label: "Pot", value: Math.min(engine.pot, raiseAction.max_amount ?? 0) },
+    { label: "All-In", value: raiseAction.max_amount ?? 0 },
+  ] : [];
+
+  // Separate "me" from "others" for layout
+  const otherPlayers = engine.players.filter((p) => p.player_id !== playerId);
+
   return (
-    <div className="page table-page">
-      {/* Header */}
-      <div className="table-header">
-        <span className="game-code">
-          {engine.game_code} — Hand #{engine.hand_number}
-        </span>
-        <span className={`connection-status ${connected ? "online" : "offline"}`}>
-          {connected ? "●" : "○"}
+    <div className="table-page">
+      {/* Header bar */}
+      <header className="table-header">
+        <div className="table-header-left">
+          <span className="table-code">{engine.game_code}</span>
+          <span className="table-hand">Hand #{engine.hand_number}</span>
+        </div>
+        <div className="table-header-right">
           {connInfo && connInfo.spectator_count > 0 && (
-            <span className="spectator-count"> 👁 {connInfo.spectator_count}</span>
+            <span className="spectator-badge">👁 {connInfo.spectator_count}</span>
           )}
-        </span>
-      </div>
-
-      {/* Street & Pot */}
-      <div className="table-info">
-        <span className="street-label">{engine.street.toUpperCase()}</span>
-        <span className="pot-label">Pot: {engine.pot}</span>
-      </div>
-
-      {/* Community Cards */}
-      <div className="community-cards">
-        {engine.community_cards.length > 0 ? (
-          <CardList cards={engine.community_cards} />
-        ) : (
-          <span className="muted">—</span>
-        )}
-      </div>
-
-      {/* My Hole Cards */}
-      {me && !me.folded && engine.my_cards.length > 0 && (
-        <div className="my-cards">
-          <CardList cards={engine.my_cards} />
+          <span className={`conn-indicator ${connected ? "on" : "off"}`} />
         </div>
-      )}
-
-      {/* Players */}
-      <div className="player-list">
-        {engine.players.map((p) => {
-          const isDealer = p.player_id === engine.dealer_player_id;
-          const isAction = p.player_id === engine.action_on;
-          const isMe = p.player_id === playerId;
-          const isOnline = connInfo?.connected_players.includes(p.player_id) ?? false;
-
-          return (
-            <div
-              key={p.player_id}
-              className={`player-row table-player ${isMe ? "me" : ""} ${isAction ? "action-on" : ""} ${p.folded ? "folded" : ""}`}
-            >
-              <div className="player-top">
-                <span className="player-name">
-                  <span className={`conn-dot ${isOnline ? "on" : "off"}`} />
-                  {isDealer && <span className="dealer-btn">D</span>}
-                  {p.name}
-                  {isMe && " (you)"}
-                </span>
-                <span className="player-chips">{p.chips}</span>
-              </div>
-              <div className="player-bottom">
-                {p.folded && <span className="status-tag folded-tag">Folded</span>}
-                {p.all_in && <span className="status-tag allin-tag">All-In</span>}
-                {p.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
-                {p.bet_this_round > 0 && (
-                  <span className="status-tag bet-tag">Bet: {p.bet_this_round}</span>
-                )}
-                {/* Show cards at showdown */}
-                {engine.showdown && p.hole_cards && !p.folded && (
-                  <CardList cards={p.hole_cards} />
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Hand Result */}
-      {engine.last_hand_result && !engine.hand_active && (
-        <div className="hand-result">
-          <h3>Hand Result</h3>
-          {engine.last_hand_result.winners.map((w, i) => (
-            <p key={i}>
-              <strong>{w.name}</strong> wins {w.winnings} — {w.hand}
-            </p>
-          ))}
-        </div>
-      )}
-
-      {/* Error */}
-      {error && <p className="error">{error}</p>}
+      </header>
 
       {/* Timer Bar */}
       {engine.hand_active && engine.turn_timeout > 0 && timeLeft !== null && engine.action_on && (
@@ -273,38 +217,124 @@ export default function TablePage() {
         </div>
       )}
 
-      {/* Actions */}
-      {isMyTurn && engine.hand_active && (
-        <div className="action-bar">
-          {canFold && (
-            <button
-              className="btn btn-fold"
-              onClick={() => doAction("fold")}
-              disabled={actionLoading}
-            >
-              Fold
-            </button>
+      {/* Felt area — community + pot */}
+      <div className="felt-area">
+        <div className="felt-street">{engine.street.toUpperCase()}</div>
+        <div className="felt-pot">
+          <span className="pot-chip" />
+          <span className="pot-amount">{engine.pot}</span>
+        </div>
+        <div className="community-cards">
+          {engine.community_cards.length > 0 ? (
+            <CardList cards={engine.community_cards} size="lg" />
+          ) : (
+            engine.hand_active
+              ? <span className="muted-cards">Dealing…</span>
+              : <span className="muted-cards">—</span>
           )}
-          {canCheck && (
-            <button
-              className="btn btn-check"
-              onClick={() => doAction("check")}
-              disabled={actionLoading}
+        </div>
+      </div>
+
+      {/* My hole cards */}
+      {me && !me.folded && engine.my_cards.length > 0 && (
+        <div className="my-cards-area">
+          <span className="my-cards-label">Your Hand</span>
+          <CardList cards={engine.my_cards} size="lg" />
+        </div>
+      )}
+
+      {/* Hand Result overlay */}
+      {engine.last_hand_result && !engine.hand_active && (
+        <div className="hand-result">
+          <div className="hand-result-inner">
+            {engine.last_hand_result.winners.map((w, i) => (
+              <div key={i} className="winner-line">
+                <span className="winner-name">{w.name}</span>
+                <span className="winner-detail">wins <strong>{w.winnings}</strong></span>
+                <span className="winner-hand">{w.hand}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Players */}
+      <div className="player-list">
+        {/* My row always first */}
+        {me && (
+          <div className={`player-row table-player me ${engine.action_on === playerId ? "action-on" : ""} ${me.folded ? "folded" : ""}`}>
+            <div className="player-top">
+              <span className="player-identity">
+                <span className={`conn-dot ${connInfo?.connected_players.includes(me.player_id) ? "on" : "off"}`} />
+                {me.player_id === engine.dealer_player_id && <span className="dealer-chip">D</span>}
+                <span className="player-name">{me.name} <span className="you-tag">you</span></span>
+              </span>
+              <span className="player-chips"><span className="chip-icon" />{me.chips}</span>
+            </div>
+            <div className="player-bottom">
+              {me.folded && <span className="status-tag folded-tag">Folded</span>}
+              {me.all_in && <span className="status-tag allin-tag">All-In</span>}
+              {me.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
+              {me.bet_this_round > 0 && <span className="status-tag bet-tag">Bet: {me.bet_this_round}</span>}
+              {engine.showdown && me.hole_cards && !me.folded && (
+                <CardList cards={me.hole_cards} size="sm" />
+              )}
+            </div>
+          </div>
+        )}
+        {otherPlayers.map((p) => {
+          const isDealer = p.player_id === engine.dealer_player_id;
+          const isAction = p.player_id === engine.action_on;
+          const isOnline = connInfo?.connected_players.includes(p.player_id) ?? false;
+
+          return (
+            <div
+              key={p.player_id}
+              className={`player-row table-player ${isAction ? "action-on" : ""} ${p.folded ? "folded" : ""}`}
             >
-              Check
-            </button>
-          )}
-          {callAction && (
-            <button
-              className="btn btn-call"
-              onClick={() => doAction("call")}
-              disabled={actionLoading}
-            >
-              Call {callAction.amount}
-            </button>
-          )}
-          {raiseAction && (
-            <div className="raise-controls">
+              <div className="player-top">
+                <span className="player-identity">
+                  <span className={`conn-dot ${isOnline ? "on" : "off"}`} />
+                  {isDealer && <span className="dealer-chip">D</span>}
+                  <span className="player-name">{p.name}</span>
+                </span>
+                <span className="player-chips"><span className="chip-icon" />{p.chips}</span>
+              </div>
+              <div className="player-bottom">
+                {p.folded && <span className="status-tag folded-tag">Folded</span>}
+                {p.all_in && <span className="status-tag allin-tag">All-In</span>}
+                {p.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
+                {p.bet_this_round > 0 && <span className="status-tag bet-tag">Bet: {p.bet_this_round}</span>}
+                {engine.showdown && p.hole_cards && !p.folded && (
+                  <CardList cards={p.hole_cards} size="sm" />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Error */}
+      {error && <p className="error">{error}</p>}
+
+      {/* Bottom action area — sticky */}
+      <div className="action-tray">
+        {/* Raise panel (slides up) */}
+        {showRaisePanel && raiseAction && (
+          <div className="raise-panel">
+            <div className="raise-presets">
+              {raisePresets.map((p) => (
+                <button
+                  key={p.label}
+                  className={`btn btn-preset ${raiseAmount === p.value ? "active" : ""}`}
+                  onClick={() => setRaiseAmount(p.value)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="raise-slider-row">
+              <span className="raise-value">{raiseAmount}</span>
               <input
                 type="range"
                 min={raiseAction.min_amount}
@@ -313,56 +343,76 @@ export default function TablePage() {
                 onChange={(e) => setRaiseAmount(Number(e.target.value))}
                 className="raise-slider"
               />
+            </div>
+            <button
+              className="btn btn-raise-confirm"
+              onClick={() => doAction("raise", raiseAmount)}
+              disabled={actionLoading}
+            >
+              Raise to {raiseAmount}
+            </button>
+          </div>
+        )}
+
+        {/* Main action buttons */}
+        {isMyTurn && engine.hand_active && (
+          <div className="action-bar">
+            {canFold && (
+              <button className="btn btn-fold" onClick={() => doAction("fold")} disabled={actionLoading}>
+                Fold
+              </button>
+            )}
+            {canCheck && (
+              <button className="btn btn-check" onClick={() => doAction("check")} disabled={actionLoading}>
+                Check
+              </button>
+            )}
+            {callAction && (
+              <button className="btn btn-call" onClick={() => doAction("call")} disabled={actionLoading}>
+                Call {callAction.amount}
+              </button>
+            )}
+            {raiseAction && (
               <button
-                className="btn btn-raise"
-                onClick={() => doAction("raise", raiseAmount)}
+                className={`btn btn-raise ${showRaisePanel ? "active" : ""}`}
+                onClick={() => setShowRaisePanel(!showRaisePanel)}
                 disabled={actionLoading}
               >
-                Raise {raiseAmount}
+                Raise
               </button>
-            </div>
-          )}
-          {allInAction && !raiseAction && (
-            <button
-              className="btn btn-allin"
-              onClick={() => doAction("all_in")}
-              disabled={actionLoading}
-            >
-              All-In {allInAction.amount}
-            </button>
-          )}
-        </div>
-      )}
+            )}
+            {allInAction && !raiseAction && (
+              <button className="btn btn-allin" onClick={() => doAction("all_in")} disabled={actionLoading}>
+                All-In {allInAction.amount}
+              </button>
+            )}
+          </div>
+        )}
 
-      {/* Between hands */}
-      {!engine.hand_active && !engine.game_over && (
-        <div className="between-hands">
-          {isCreator && (
-            <button
-              className="btn btn-primary"
-              onClick={doDeal}
-              disabled={actionLoading}
-            >
-              Deal Next Hand
-            </button>
-          )}
-          {me && me.chips === 0 && (
-            <button
-              className="btn btn-secondary"
-              onClick={doRebuy}
-              disabled={actionLoading}
-            >
-              Rebuy
-            </button>
-          )}
-        </div>
-      )}
+        {/* Between hands */}
+        {!engine.hand_active && !engine.game_over && (
+          <div className="between-hands">
+            {isCreator && (
+              <button className="btn btn-deal" onClick={doDeal} disabled={actionLoading}>
+                Deal Next Hand
+              </button>
+            )}
+            {me && me.chips === 0 && (
+              <button className="btn btn-rebuy" onClick={doRebuy} disabled={actionLoading}>
+                Rebuy
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {engine.game_over && (
-        <div className="game-over">
-          <h2>Game Over</h2>
-          <p>{engine.message}</p>
-          <Link to="/" className="btn btn-primary">Back to Home</Link>
+        <div className="game-over-overlay">
+          <div className="game-over-card">
+            <h2>Game Over</h2>
+            <p>{engine.message}</p>
+            <Link to="/" className="btn btn-primary">Back to Home</Link>
+          </div>
         </div>
       )}
     </div>

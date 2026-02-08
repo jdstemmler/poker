@@ -15,10 +15,8 @@ export default function LobbyPage() {
   const playerId = sessionStorage.getItem("playerId");
   const playerPin = sessionStorage.getItem("playerPin");
 
-  // Not authenticated — must join/create first
   const notAuthenticated = !playerId || !playerPin;
 
-  // WebSocket URL (only connect when authenticated)
   const wsUrl =
     code && playerId ? buildWsUrl(code, playerId) : null;
 
@@ -36,7 +34,6 @@ export default function LobbyPage() {
     onConnectionInfo: handleConnectionInfo,
   });
 
-  // Fetch initial game state
   useEffect(() => {
     if (!code) return;
     getGame(code)
@@ -44,7 +41,6 @@ export default function LobbyPage() {
       .catch((e) => setError(e.message));
   }, [code]);
 
-  // Redirect to table when game becomes active
   useEffect(() => {
     if (game?.status === "active" && code) {
       navigate(`/game/${code}/table`);
@@ -56,9 +52,7 @@ export default function LobbyPage() {
       <div className="page">
         <h1>Not Authenticated</h1>
         <p>You need to create or join a game first.</p>
-        <Link to="/" className="btn btn-primary">
-          Go Home
-        </Link>
+        <Link to="/" className="btn btn-primary">Go Home</Link>
       </div>
     );
   }
@@ -68,24 +62,21 @@ export default function LobbyPage() {
       <div className="page">
         <h1>Error</h1>
         <p className="error">{error}</p>
-        <Link to="/" className="btn btn-primary">
-          Go Home
-        </Link>
+        <Link to="/" className="btn btn-primary">Go Home</Link>
       </div>
     );
   }
 
   if (!game) {
     return (
-      <div className="page">
-        <p>Loading…</p>
-      </div>
+      <div className="page"><div className="loading-spinner" /><p>Loading…</p></div>
     );
   }
 
   const isCreator = playerId === game.creator_id;
   const me = game.players.find((p) => p.id === playerId);
   const allReady = game.players.length >= 2 && game.players.every((p) => p.ready);
+  const readyCount = game.players.filter((p) => p.ready).length;
 
   const handleReady = async () => {
     if (!code || !playerId || !playerPin) return;
@@ -123,61 +114,64 @@ export default function LobbyPage() {
     return (
       <div className="page">
         <h1>Game Started!</h1>
-        <p>Game <strong>{game.code}</strong> is now active.</p>
-        <p className="muted">(Gameplay will be implemented in Phase 2)</p>
+        <p>Redirecting to table…</p>
       </div>
     );
   }
 
   return (
-    <div className="page">
+    <div className="page lobby-page">
       <div className="lobby-header">
         <h1>Lobby</h1>
-        <div className="game-code">
-          Code: <strong>{game.code}</strong>
+        <div className="lobby-code">
+          <span className="lobby-code-value">{game.code}</span>
+          <span className="lobby-code-hint">Share this code with friends</span>
         </div>
-        <div className={`connection-status ${connected ? "online" : "offline"}`}>
-          {connected ? "● Connected" : "○ Disconnected"}
-        </div>
+        <span className={`conn-status-pill ${connected ? "on" : "off"}`}>
+          <span className="conn-dot-sm" />
+          {connected ? "Connected" : "Disconnected"}
+        </span>
       </div>
 
-      <div className="settings-summary">
-        <span>Chips: {game.settings.starting_chips}</span>
-        <span>
-          Blinds: {game.settings.small_blind}/{game.settings.big_blind}
-        </span>
-        <span>Max: {game.settings.max_players} players</span>
-        {game.settings.allow_rebuys && <span>Rebuys: On</span>}
-        {game.settings.turn_timeout > 0 && (
-          <span>Timer: {game.settings.turn_timeout}s</span>
-        )}
+      <div className="settings-pills">
+        <span className="pill">💰 {game.settings.starting_chips}</span>
+        <span className="pill">🎯 {game.settings.small_blind}/{game.settings.big_blind}</span>
+        <span className="pill">👥 Max {game.settings.max_players}</span>
+        {game.settings.allow_rebuys && <span className="pill">🔄 Rebuys</span>}
+        {game.settings.turn_timeout > 0 && <span className="pill">⏱ {game.settings.turn_timeout}s</span>}
       </div>
 
       <div className="player-list">
-        <h2>
-          Players ({game.players.length}/{game.settings.max_players})
+        <h2 className="section-heading">
+          Players
+          <span className="ready-count">{readyCount}/{game.players.length} ready</span>
         </h2>
-        {game.players.map((p) => (
-          <div
-            key={p.id}
-            className={`player-row ${p.id === playerId ? "me" : ""}`}
-          >
-            <span className={`conn-dot ${connInfo?.connected_players.includes(p.id) ? "on" : p.connected ? "on" : "off"}`} />
-            <span className="player-name">
-              {p.name}
-              {p.is_creator && " ★"}
-              {p.id === playerId && " (you)"}
-            </span>
-            <span className={`ready-badge ${p.ready ? "ready" : "not-ready"}`}>
-              {p.ready ? "Ready" : "Not Ready"}
-            </span>
-          </div>
-        ))}
+        {game.players.map((p) => {
+          const isOnline = connInfo?.connected_players.includes(p.id) ?? p.connected;
+          return (
+            <div
+              key={p.id}
+              className={`player-row lobby-player ${p.id === playerId ? "me" : ""}`}
+            >
+              <span className="player-identity">
+                <span className={`conn-dot ${isOnline ? "on" : "off"}`} />
+                <span className="player-name">
+                  {p.name}
+                  {p.is_creator && <span className="creator-star"> ★</span>}
+                  {p.id === playerId && <span className="you-tag">you</span>}
+                </span>
+              </span>
+              <span className={`ready-badge ${p.ready ? "ready" : "not-ready"}`}>
+                {p.ready ? "✓ Ready" : "Waiting"}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       <div className="lobby-actions">
         <button
-          className={`btn ${me?.ready ? "btn-secondary" : "btn-primary"}`}
+          className={`btn btn-lg ${me?.ready ? "btn-secondary" : "btn-primary"}`}
           onClick={handleReady}
           disabled={actionLoading}
         >
@@ -186,7 +180,7 @@ export default function LobbyPage() {
 
         {isCreator && (
           <button
-            className="btn btn-primary"
+            className="btn btn-primary btn-lg"
             onClick={handleStart}
             disabled={actionLoading || !allReady}
             title={!allReady ? "All players must be ready" : ""}
@@ -195,10 +189,6 @@ export default function LobbyPage() {
           </button>
         )}
       </div>
-
-      <p className="share-hint">
-        Share code <strong>{game.code}</strong> with friends to join!
-      </p>
     </div>
   );
 }

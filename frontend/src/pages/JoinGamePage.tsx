@@ -42,6 +42,7 @@ export default function JoinGamePage() {
             onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 6))}
             maxLength={6}
             placeholder="e.g. ABC123"
+            className="code-input"
             required
           />
         </label>
@@ -53,6 +54,7 @@ export default function JoinGamePage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={20}
+            placeholder="Display name"
             required
           />
         </label>
@@ -66,6 +68,7 @@ export default function JoinGamePage() {
             maxLength={4}
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="••••"
             required
           />
         </label>
@@ -74,7 +77,7 @@ export default function JoinGamePage() {
 
         <button
           type="submit"
-          className="btn btn-primary"
+          className="btn btn-primary btn-lg"
           disabled={loading || code.length < 4 || pin.length !== 4 || !name.trim()}
         >
           {loading ? "Joining…" : "Join Game"}
