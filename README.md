@@ -5,14 +5,19 @@ A self-hosted, mobile-first web application for playing **No-Limit Texas Hold'em
 ## Features
 
 - **Lobby system** — Create/join games with a short room code and 4-digit PIN
-- **Full NL Hold'em engine** — Blinds, betting rounds, pot management, showdown, side pots
+- **Full NL Hold'em engine** — Blinds, betting rounds, pot management, showdown
 - **Real-time updates** — WebSocket-driven state sync with automatic reconnection
 - **Turn timer** — Optional configurable countdown with auto-fold/auto-check
+- **Auto-deal** — Automatic dealing after a configurable delay between hands
+- **Blind schedule** — Configurable escalating blind levels on a timed schedule
+- **Pause / Unpause** — Creator can pause the game (freezes timers and blind clock)
 - **Mobile-first UI** — Dark theme, touch-optimized action buttons, responsive layout
-- **Pre-Fold** — Queue a fold before your turn arrives
 - **Voluntary card reveal** — Cards hidden by default after each hand; players choose whether to show
 - **Spectator mode** — Watch a game without joining
-- **Rebuys** — Optional rebuy when busted
+- **Rebuys** — Optional rebuy when busted, with configurable max count and time cutoff
+- **Copy join link** — One-tap share link from the lobby
+- **Last action tracking** — See each player's most recent action at the table
+- **Stale game cleanup** — Background task auto-deletes inactive games after 24 hours
 
 ## Tech Stack
 
@@ -25,6 +30,7 @@ A self-hosted, mobile-first web application for playing **No-Limit Texas Hold'em
 | Real-time | WebSocket (FastAPI native) |
 | Deployment | Docker Compose (3 containers) |
 | Reverse Proxy | Nginx (serves frontend, proxies API/WS) |
+| Testing | pytest, pytest-asyncio, httpx |
 
 ## Quick Start
 
@@ -70,6 +76,16 @@ uvicorn app.main:app --reload --port 8000
 
 Requires a running Redis instance at `localhost:6379` (or set `REDIS_URL`).
 
+### Running Tests
+
+```bash
+cd backend
+source .venv/bin/activate
+python -m pytest tests/ -v
+```
+
+The test suite (210 tests) covers cards, hand evaluation, game engine, betting actions, serialization, business logic, and API endpoints. No running Redis is required — external dependencies are mocked.
+
 ### Frontend
 
 ```bash
@@ -112,7 +128,8 @@ VITE_API_BASE=http://localhost:8000 VITE_WS_BASE=ws://localhost:8000 npm run dev
 | `evaluator.py` | Hand evaluation (7-card to 5-card best hand, winner determination) |
 | `game_manager.py` | Business logic layer between routes and engine |
 | `ws_manager.py` | WebSocket connection manager with heartbeat and spectator support |
-| `timer.py` | Background action timer (auto-fold/auto-check on timeout) |
+| `timer.py` | Background action timer (auto-fold/auto-check on timeout, auto-deal) |
+| `cleanup.py` | Background stale-game cleanup (deletes inactive games after 24h) |
 | `models.py` | Pydantic request/response models |
 | `redis_client.py` | Async Redis persistence layer |
 
@@ -144,9 +161,16 @@ VITE_API_BASE=http://localhost:8000 VITE_WS_BASE=ws://localhost:8000 npm run dev
 |--------|----------|-------------|
 | `GET` | `/api/games/{code}/state/{player_id}` | Get engine state (player's view) |
 | `POST` | `/api/games/{code}/action` | Submit action (fold/check/call/raise/all_in) |
-| `POST` | `/api/games/{code}/deal` | Deal next hand (creator only) |
+| `POST` | `/api/games/{code}/deal` | Deal next hand (any player) |
 | `POST` | `/api/games/{code}/rebuy` | Request a rebuy |
 | `POST` | `/api/games/{code}/show_cards` | Voluntarily reveal cards after a hand |
+| `POST` | `/api/games/{code}/pause` | Toggle pause (creator only) |
+
+### Admin
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/admin/cleanup` | Manually trigger stale-game cleanup |
 
 ### WebSocket
 
@@ -163,21 +187,25 @@ VITE_API_BASE=http://localhost:8000 VITE_WS_BASE=ws://localhost:8000 npm run dev
 5. **Start** — creator starts the game, first hand is dealt automatically
 6. **Play** — standard No-Limit Hold'em: preflop → flop → turn → river → showdown
 7. **Between hands** — cards are hidden; players may click "Show Cards" to reveal
-8. **Next hand** — creator clicks "Deal Next Hand" to continue
+8. **Next hand** — any player clicks "Deal Next Hand" to continue (or auto-deal fires)
 9. **Rebuy** — busted players can rebuy back to starting chips (if enabled)
+10. **Pause** — creator can pause the game to freeze timers and the blind clock
 
 ## Configuration
 
 Game settings are configured at creation time:
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Starting Chips | 1000 | Chips each player starts with |
-| Small Blind | 5 | Small blind amount |
-| Big Blind | 10 | Big blind amount |
-| Max Players | 8 | Maximum seats at the table |
-| Allow Rebuys | Yes | Whether busted players can rebuy |
-| Turn Timeout | 0 (off) | Seconds per turn (0 = unlimited) |
+| Setting | Default | Range | Description |
+|---------|---------|-------|-------------|
+| Starting Chips | 1000 | 100–100,000 | Chips each player starts with |
+| Small Blind | 10 | 1+ | Small blind amount |
+| Big Blind | 20 | 2+ | Big blind amount |
+| Max Players | 9 | 4–9 | Maximum seats at the table |
+| Allow Rebuys | Yes | — | Whether busted players can rebuy |
+| Max Rebuys | 1 | 0–99 | Rebuys per player (0 = unlimited) |
+| Rebuy Cutoff | 60 min | 0–480 | Time window for rebuys (0 = no cutoff) |
+| Turn Timeout | 0 (off) | 0–300 | Seconds per turn (0 = unlimited) |
+| Blind Level Duration | 0 (off) | 0–120 | Minutes per blind level (0 = fixed blinds) |
 
 ## License
 
