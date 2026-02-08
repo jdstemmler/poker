@@ -25,6 +25,7 @@ export default function JoinGamePage() {
       sessionStorage.setItem("playerId", res.player_id);
       sessionStorage.setItem("playerPin", pin);
       sessionStorage.setItem("playerName", name.trim());
+      sessionStorage.removeItem("isSpectator");
       // Navigate to table if game is active, lobby otherwise
       const dest = res.game.status === "active"
         ? `/game/${code.toUpperCase()}/table`
@@ -35,6 +36,20 @@ export default function JoinGamePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleWatch = () => {
+    if (code.length < 4) {
+      setError("Enter a game code to watch");
+      return;
+    }
+    setError("");
+    const spectatorId = `spectator_${crypto.randomUUID().slice(0, 8)}`;
+    sessionStorage.setItem("playerId", spectatorId);
+    sessionStorage.removeItem("playerPin");
+    sessionStorage.removeItem("playerName");
+    sessionStorage.setItem("isSpectator", "true");
+    navigate(`/game/${code.toUpperCase()}/table`);
   };
 
   return (
@@ -102,6 +117,17 @@ export default function JoinGamePage() {
         </button>
       </form>
 
+      <div className="watch-divider">
+        <span>or</span>
+      </div>
+      <button
+        className="btn btn-secondary btn-lg"
+        onClick={handleWatch}
+        disabled={code.length < 4}
+      >
+        Watch Game
+      </button>
+
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} title="Joining a Game">
         <h3>What You Need</h3>
         <dl>
@@ -128,6 +154,7 @@ export default function JoinGamePage() {
           <li>You can only join a game that's still in the lobby (not yet started) unless you're reconnecting.</li>
           <li>Names are case-insensitive — "Alice" and "alice" are the same player.</li>
           <li>If the game has already started, reconnecting will take you straight to the table.</li>
+          <li><strong>Watch Game</strong> lets you spectate without joining — just enter the game code. You'll see the table and community cards but not any player's hole cards.</li>
         </ul>
       </HelpModal>
     </div>

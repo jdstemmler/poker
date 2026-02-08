@@ -226,6 +226,24 @@ input::placeholder {
   text-align: center;
 }
 
+.watch-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.25rem 0;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.watch-divider::before,
+.watch-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 .row {
   display: flex;
   gap: 0.75rem;

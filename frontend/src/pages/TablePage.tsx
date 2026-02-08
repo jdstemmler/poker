@@ -31,7 +31,8 @@ export default function TablePage() {
 
   const playerId = sessionStorage.getItem("playerId");
   const playerPin = sessionStorage.getItem("playerPin");
-  const notAuthenticated = !playerId || !playerPin;
+  const isSpectator = sessionStorage.getItem("isSpectator") === "true";
+  const notAuthenticated = !playerId || (!playerPin && !isSpectator);
 
   const wsUrl = code && playerId ? buildWsUrl(code, playerId) : null;
 
@@ -432,6 +433,7 @@ export default function TablePage() {
           {connInfo && connInfo.spectator_count > 0 && (
             <span className="spectator-badge">👁 {connInfo.spectator_count}</span>
           )}
+          {isSpectator && <span className="spectator-badge">Watching</span>}
           <span className={`conn-indicator ${connected ? "on" : "off"}`} />
         </div>
       </header>
@@ -559,8 +561,8 @@ export default function TablePage() {
       {/* Error */}
       {error && <p className="error">{error}</p>}
 
-      {/* Bottom action area — sticky */}
-      <div className="action-tray">
+      {/* Bottom action area — sticky (hidden for spectators) */}
+      {!isSpectator && <div className="action-tray">
         {/* Raise panel (slides up) */}
         {showRaisePanel && raiseAction && (
           <div className="raise-panel">
@@ -685,7 +687,7 @@ export default function TablePage() {
             )}
           </div>
         )}
-      </div>
+      </div>}
 
       {engine.game_over && (
         <div className="game-over-overlay">

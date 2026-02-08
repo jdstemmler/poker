@@ -13,7 +13,7 @@ A self-hosted, mobile-first web application for playing **No-Limit Texas Hold'em
 - **Pause / Unpause** — Creator can pause the game (freezes timers and blind clock)
 - **Mobile-first UI** — Dark theme, touch-optimized action buttons, responsive layout
 - **Voluntary card reveal** — Cards hidden by default after each hand; players choose whether to show
-- **Spectator mode** — Watch a game without joining
+- **Spectator mode** — Watch a game without joining (via the Join page)
 - **Rebuys** — Optional rebuy when busted, with configurable max count and time cutoff
 - **Copy join link** — One-tap share link from the lobby
 - **Last action tracking** — See each player's most recent action at the table
