@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createGame } from "../api";
+import HelpModal from "../components/HelpModal";
 
 export default function CreateGamePage() {
   const navigate = useNavigate();
+  const [helpOpen, setHelpOpen] = useState(false);
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [startingChips, setStartingChips] = useState(1000);
@@ -49,6 +51,7 @@ export default function CreateGamePage() {
 
   return (
     <div className="page">
+      <button className="help-btn" onClick={() => setHelpOpen(true)} aria-label="Help">?</button>
       <h1>Create Game</h1>
       <form onSubmit={handleSubmit} className="form">
         <fieldset className="form-section">
@@ -202,6 +205,56 @@ export default function CreateGamePage() {
           {loading ? "Creating…" : "Create Game"}
         </button>
       </form>
+
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} title="Game Settings Help">
+        <h3>Your Identity</h3>
+        <dl>
+          <dt>Name</dt>
+          <dd>Your display name at the table (up to 20 characters).</dd>
+          <dt>4-Digit PIN</dt>
+          <dd>
+            A simple password for your seat. You'll need it to reconnect if you
+            drop — remember it!
+          </dd>
+        </dl>
+
+        <h3>Game Settings</h3>
+        <dl>
+          <dt>Starting Chips</dt>
+          <dd>How many chips each player begins with (100–100,000).</dd>
+          <dt>Small Blind / Big Blind</dt>
+          <dd>
+            The forced bets posted each hand. The big blind is typically 2× the
+            small blind.
+          </dd>
+          <dt>Max Players</dt>
+          <dd>Seats available at the table (4–9).</dd>
+          <dt>Turn Timer</dt>
+          <dd>
+            Seconds each player has to act. When time runs out, the player
+            auto-checks or auto-folds. Set to <strong>0</strong> for unlimited time.
+          </dd>
+          <dt>Blind Level Duration</dt>
+          <dd>
+            Minutes between blind increases. The blinds double at each level
+            on an auto-generated schedule. Set to <strong>0</strong> for fixed blinds.
+          </dd>
+          <dt>Allow Rebuys</dt>
+          <dd>
+            When enabled, busted players (0 chips) can rebuy back to the starting
+            stack between hands.
+          </dd>
+          <dt>Max Rebuys</dt>
+          <dd>
+            How many times a player can rebuy. Set to <strong>0</strong> for unlimited.
+          </dd>
+          <dt>Rebuy Cutoff</dt>
+          <dd>
+            Minutes after game start when rebuys are no longer allowed.
+            Set to <strong>0</strong> for no time limit.
+          </dd>
+        </dl>
+      </HelpModal>
     </div>
   );
 }

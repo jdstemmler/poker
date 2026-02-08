@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { joinGame } from "../api";
+import HelpModal from "../components/HelpModal";
 
 export default function JoinGamePage() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export default function JoinGamePage() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +39,7 @@ export default function JoinGamePage() {
 
   return (
     <div className="page">
+      <button className="help-btn" onClick={() => setHelpOpen(true)} aria-label="Help">?</button>
       <h1>Join Game</h1>
       <form onSubmit={handleSubmit} className="form">
         <label>
@@ -88,6 +91,35 @@ export default function JoinGamePage() {
           {loading ? "Joining…" : "Join Game"}
         </button>
       </form>
+
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} title="Joining a Game">
+        <h3>What You Need</h3>
+        <dl>
+          <dt>Game Code</dt>
+          <dd>
+            The 6-character code shared by the game creator. You can also join
+            via a direct link — the code will be filled in automatically.
+          </dd>
+          <dt>Your Name</dt>
+          <dd>
+            Pick a display name (up to 20 characters). This is how other players
+            will see you at the table.
+          </dd>
+          <dt>4-Digit PIN</dt>
+          <dd>
+            A simple password that secures your seat. If you get disconnected,
+            use the <strong>same name and PIN</strong> to reconnect — even if the
+            game has already started.
+          </dd>
+        </dl>
+
+        <h3>Good to Know</h3>
+        <ul>
+          <li>You can only join a game that's still in the lobby (not yet started) unless you're reconnecting.</li>
+          <li>Names are case-insensitive — "Alice" and "alice" are the same player.</li>
+          <li>If the game has already started, reconnecting will take you straight to the table.</li>
+        </ul>
+      </HelpModal>
     </div>
   );
 }

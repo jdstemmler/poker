@@ -61,6 +61,7 @@ body {
 
 /* ===== Page Layout ===== */
 .page {
+  position: relative;
   max-width: 480px;
   width: 100%;
   margin: 0 auto;
@@ -321,6 +322,30 @@ input::placeholder {
   max-width: 280px;
 }
 
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #e6edf3;
+  background: #21262d;
+  border: 1px solid #363b42;
+  padding: 0.5rem 1.1rem;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.github-link:hover {
+  background: #30363d;
+  border-color: #53585f;
+}
+
+.github-link svg {
+  flex-shrink: 0;
+}
+
 .coffee-link {
   font-size: 0.8rem;
   color: var(--text-dim);
@@ -331,6 +356,158 @@ input::placeholder {
 
 .coffee-link:hover {
   opacity: 0.85;
+}
+
+/* ===== Help Button & Modal ===== */
+.help-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 5;
+}
+
+.help-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.help-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.help-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-width: 440px;
+  width: 100%;
+  max-height: 80dvh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.25s ease-out;
+}
+
+.help-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.help-modal-header h2 {
+  font-size: 1.1rem;
+  color: #fff;
+  margin: 0;
+}
+
+.help-modal-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.help-modal-close:hover {
+  color: var(--text);
+}
+
+.help-modal-body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.help-modal-body h3 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 1rem 0 0.4rem;
+  text-align: left;
+}
+
+.help-modal-body h3:first-child {
+  margin-top: 0;
+}
+
+.help-modal-body p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: left;
+  line-height: 1.55;
+  margin: 0 0 0.5rem;
+}
+
+.help-modal-body ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+}
+
+.help-modal-body ul li {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  padding-left: 1.2rem;
+  position: relative;
+  margin-bottom: 0.3rem;
+}
+
+.help-modal-body ul li::before {
+  content: "•";
+  position: absolute;
+  left: 0.2rem;
+  color: var(--accent);
+}
+
+.help-modal-body dl {
+  margin: 0 0 0.5rem;
+}
+
+.help-modal-body dt {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  margin-top: 0.5rem;
+}
+
+.help-modal-body dd {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0.15rem 0 0 0;
+  padding-left: 0.75rem;
+  line-height: 1.5;
+}
+
+.help-modal-body strong {
+  color: var(--text);
+  font-weight: 600;
 }
 
 /* ===== Lobby ===== */
