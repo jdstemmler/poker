@@ -378,6 +378,34 @@ input::placeholder {
   opacity: 1;
 }
 
+/* ===== Back Arrow ===== */
+.back-arrow {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 5;
+}
+
+.back-arrow:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ===== Help Button & Modal ===== */
 .help-btn {
   position: absolute;

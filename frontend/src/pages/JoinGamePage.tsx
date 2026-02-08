@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { joinGame } from "../api";
 import HelpModal from "../components/HelpModal";
 
@@ -55,6 +55,7 @@ export default function JoinGamePage() {
   return (
     <div className="page">
       <button className="help-btn" onClick={() => setHelpOpen(true)} aria-label="Help">?</button>
+      <Link to="/" className="back-arrow" aria-label="Back to Home">←</Link>
       <h1>Join Game</h1>
       <form onSubmit={handleSubmit} className="form" autoComplete="off" data-1p-ignore>
         <label>
