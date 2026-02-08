@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Back card (tilted left) -->
+  <rect x="8" y="6" width="32" height="44" rx="4" ry="4" fill="#1a3a5c" stroke="#2a5a8c" stroke-width="2" transform="rotate(-10 24 28)"/>
+  <!-- Front card (tilted right) -->
+  <rect x="22" y="10" width="32" height="44" rx="4" ry="4" fill="#fff" stroke="#ccc" stroke-width="1.5" transform="rotate(8 38 32)"/>
+  <!-- Spade symbol on front card -->
+  <text x="38" y="40" font-family="serif" font-size="24" font-weight="bold" fill="#1a1a2e" text-anchor="middle" transform="rotate(8 38 32)">♠</text>
+  <!-- Red heart on back card corner -->
+  <text x="24" y="34" font-family="serif" font-size="18" fill="#d32f2f" text-anchor="middle" transform="rotate(-10 24 28)">♥</text>
+</svg>
