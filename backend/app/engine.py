@@ -221,6 +221,10 @@ class GameEngine:
         self.paused_at: Optional[float] = None  # timestamp when paused
         self.total_paused_seconds: float = 0  # accumulated pause time
 
+        # Game over flag (persisted so broadcasts include it)
+        self.game_over: bool = False
+        self.game_over_message: str = ""
+
     @classmethod
     def _build_schedule_from(
         cls, start_sb: int, start_bb: int
@@ -353,6 +357,8 @@ class GameEngine:
 
         live_players = [i for i, p in enumerate(self.seats) if not p.is_sitting_out]
         if len(live_players) < 2:
+            self.game_over = True
+            self.game_over_message = "Not enough players to continue"
             return self._build_state(
                 message="Not enough players to continue",
                 game_over=True,
@@ -1031,10 +1037,16 @@ class GameEngine:
     def _build_state(
         self,
         message: str = "",
-        game_over: bool = False,
+        game_over: bool | None = None,
         showdown: bool = False,
     ) -> dict[str, Any]:
         """Build the full game state dict for broadcasting."""
+        # Use persisted game_over flag if not explicitly overridden
+        if game_over is None:
+            game_over = self.game_over
+        if not message and self.game_over:
+            message = self.game_over_message
+
         action_on_player_id = None
         if self.hand_active and self.action_on_idx is not None:
             p = self.seats[self.action_on_idx]
@@ -1184,6 +1196,8 @@ class GameEngine:
             "paused": self.paused,
             "paused_at": self.paused_at,
             "total_paused_seconds": self.total_paused_seconds,
+            "game_over": self.game_over,
+            "game_over_message": self.game_over_message,
         }
 
     @classmethod
@@ -1224,6 +1238,8 @@ class GameEngine:
         engine.paused = data.get("paused", False)
         engine.paused_at = data.get("paused_at")
         engine.total_paused_seconds = data.get("total_paused_seconds", 0)
+        engine.game_over = data.get("game_over", False)
+        engine.game_over_message = data.get("game_over_message", "")
 
         engine.seats = []
         for s in data["seats"]:
