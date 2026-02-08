@@ -16,6 +16,14 @@ export default function HomePage() {
           Join Game
         </Link>
       </div>
+      <a
+        href="https://buymeacoffee.com/jdstemmler"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="coffee-link"
+      >
+        ☕ Buy me a coffee
+      </a>
     </div>
   );
 }

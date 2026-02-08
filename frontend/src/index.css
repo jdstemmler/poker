@@ -321,6 +321,18 @@ input::placeholder {
   max-width: 280px;
 }
 
+.coffee-link {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.coffee-link:hover {
+  opacity: 0.85;
+}
+
 /* ===== Lobby ===== */
 .lobby-page {
   gap: 1.25rem;
