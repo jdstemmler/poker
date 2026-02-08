@@ -1208,6 +1208,53 @@ input::placeholder {
   cursor: not-allowed;
 }
 
+/* Pause / Resume */
+.paused-banner {
+  text-align: center;
+  padding: 0.5rem;
+  background: var(--orange-dim);
+  color: var(--orange);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  animation: pulse-glow-orange 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-orange {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+
+.btn-pause {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-elevated);
+  color: var(--orange);
+  border: 1px solid var(--orange);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-resume {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--green);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Game Over Overlay */
 .game-over-overlay {
   position: fixed;

@@ -282,6 +282,8 @@ async def deal_next_hand(code: str, player_id: str, pin: str) -> dict[str, Any]:
     engine = await _load_engine(code)
     if engine.hand_active:
         raise ValueError("Current hand is still in progress")
+    if engine.paused:
+        raise ValueError("Game is paused")
 
     result = engine.start_new_hand()
     await _save_engine(code, engine)
@@ -309,5 +311,26 @@ async def show_cards(code: str, player_id: str, pin: str) -> dict[str, Any]:
     engine = await _load_engine(code)
     result = engine.show_cards(player_id)
     await _save_engine(code, engine)
+
+    return result
+
+
+async def toggle_pause(code: str, player_id: str, pin: str) -> dict[str, Any]:
+    """Toggle pause state (creator only)."""
+    game_data = await redis_client.load_game(code)
+    if game_data is None:
+        raise ValueError("Game not found")
+    if game_data["creator_id"] != player_id:
+        raise ValueError("Only the creator can pause/unpause the game")
+
+    await verify_player(code, player_id, pin)
+
+    engine = await _load_engine(code)
+    if engine.paused:
+        result = engine.unpause()
+    else:
+        result = engine.pause()
+    await _save_engine(code, engine)
+    await redis_client.touch_activity(code)
 
     return result

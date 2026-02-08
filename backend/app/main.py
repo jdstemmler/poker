@@ -195,6 +195,26 @@ async def show_cards(code: str, req: ShowCardsRequest):
     return {"ok": True}
 
 
+class PauseRequest(BaseModel):
+    player_id: str
+    pin: str = Field(..., pattern=r"^\d{4}$")
+
+
+@app.post("/api/games/{code}/pause")
+async def toggle_pause(code: str, req: PauseRequest):
+    """Toggle pause state (creator only)."""
+    try:
+        result = await game_manager.toggle_pause(
+            code.upper(), req.player_id, req.pin
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await _broadcast_engine_state(code.upper())
+    await _sync_timer(code.upper())
+    return {"ok": True}
+
+
 @app.post("/api/admin/cleanup")
 async def admin_cleanup():
     """Manually trigger stale-game cleanup. Returns deleted and kept game codes."""

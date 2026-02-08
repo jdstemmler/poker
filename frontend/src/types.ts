@@ -120,6 +120,8 @@ export interface EngineState {
   next_blind_change_at: number | null;
   max_rebuys: number;
   rebuy_cutoff_minutes: number;
+  paused: boolean;
+  total_paused_seconds: number;
 }
 
 /** WebSocket message wrapper. */

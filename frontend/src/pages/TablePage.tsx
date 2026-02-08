@@ -10,6 +10,7 @@ import {
   requestRebuy,
   showCards,
   getGame,
+  togglePause,
 } from "../api";
 import { useGameSocket } from "../useGameSocket";
 import { CardList } from "../components/CardDisplay";
@@ -18,7 +19,7 @@ import type { EngineState, GameState, ConnectionInfo } from "../types";
 export default function TablePage() {
   const { code } = useParams<{ code: string }>();
   const [engine, setEngine] = useState<EngineState | null>(null);
-  const [, setLobbyGame] = useState<GameState | null>(null);
+  const [lobbyGame, setLobbyGame] = useState<GameState | null>(null);
   const [connInfo, setConnInfo] = useState<ConnectionInfo | null>(null);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -61,6 +62,8 @@ export default function TablePage() {
       .then(setLobbyGame)
       .catch(() => {});
   }, [code, playerId]);
+
+  const isCreator = lobbyGame?.creator_id === playerId;
 
   // Update raise slider when valid actions change
   useEffect(() => {
@@ -150,7 +153,8 @@ export default function TablePage() {
     }
 
     const tick = () => {
-      const secs = Math.max(0, Math.floor(Date.now() / 1000 - engine.game_started_at!));
+      const totalElapsed = Date.now() / 1000 - engine.game_started_at!;
+      const secs = Math.max(0, Math.floor(totalElapsed - (engine.total_paused_seconds ?? 0)));
       const h = Math.floor(secs / 3600);
       const m = Math.floor((secs % 3600) / 60);
       const s = secs % 60;
@@ -162,10 +166,13 @@ export default function TablePage() {
     };
 
     tick();
-    elapsedRef.current = setInterval(tick, 1000);
+    // Stop ticking while paused (time is frozen)
+    if (!engine.paused) {
+      elapsedRef.current = setInterval(tick, 1000);
+    }
 
     return () => clearInterval(elapsedRef.current);
-  }, [engine?.game_started_at]);
+  }, [engine?.game_started_at, engine?.paused, engine?.total_paused_seconds]);
 
   // Next blind change countdown
   const [blindCountdown, setBlindCountdown] = useState("");
@@ -278,6 +285,19 @@ export default function TablePage() {
     }
   };
 
+  const doPause = async () => {
+    if (!code || !playerId || !playerPin) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      await togglePause(code, { player_id: playerId, pin: playerPin });
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Find valid actions
   const canFold = engine.valid_actions.some((a) => a.action === "fold");
   const canCheck = engine.valid_actions.some((a) => a.action === "check");
@@ -326,6 +346,13 @@ export default function TablePage() {
           <span className="timer-label">
             {engine.action_on === playerId ? "Your turn" : ""} {Math.ceil(timeLeft)}s
           </span>
+        </div>
+      )}
+
+      {/* Paused banner */}
+      {engine.paused && (
+        <div className="paused-banner">
+          ⏸ Game Paused
         </div>
       )}
 
@@ -520,9 +547,14 @@ export default function TablePage() {
         {/* Between hands */}
         {!engine.hand_active && !engine.game_over && (
           <div className="between-hands">
-            <button className="btn btn-deal" onClick={doDeal} disabled={actionLoading}>
-              Deal Now{dealTimeLeft !== null ? ` (${Math.ceil(dealTimeLeft)}s)` : ""}
+            <button className="btn btn-deal" onClick={doDeal} disabled={actionLoading || engine.paused}>
+              Deal Now{dealTimeLeft !== null && !engine.paused ? ` (${Math.ceil(dealTimeLeft)}s)` : ""}
             </button>
+            {isCreator && (
+              <button className={`btn ${engine.paused ? "btn-resume" : "btn-pause"}`} onClick={doPause} disabled={actionLoading}>
+                {engine.paused ? "▶ Resume" : "⏸ Pause"}
+              </button>
+            )}
             {me && me.chips === 0 && (
               <button className="btn btn-rebuy" onClick={doRebuy} disabled={actionLoading}>
                 Rebuy

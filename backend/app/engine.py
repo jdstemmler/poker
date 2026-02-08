@@ -210,6 +210,11 @@ class GameEngine:
         # Players who chose to reveal their cards post-hand
         self.shown_cards: set[str] = set()
 
+        # Pause support
+        self.paused: bool = False
+        self.paused_at: Optional[float] = None  # timestamp when paused
+        self.total_paused_seconds: float = 0  # accumulated pause time
+
     @classmethod
     def _build_schedule_from(
         cls, start_sb: int, start_bb: int
@@ -275,10 +280,17 @@ class GameEngine:
 
     def _set_auto_deal_deadline(self) -> None:
         """Set the auto-deal deadline after a hand ends."""
-        if self.auto_deal_delay > 0 and not self.hand_active:
+        if self.auto_deal_delay > 0 and not self.hand_active and not self.paused:
             self.auto_deal_deadline = time.time() + self.auto_deal_delay
         else:
             self.auto_deal_deadline = None
+
+    def _effective_elapsed(self) -> float:
+        """Return elapsed game seconds excluding paused time."""
+        if self.game_started_at is None:
+            return 0
+        now = self.paused_at if self.paused and self.paused_at else time.time()
+        return (now - self.game_started_at) - self.total_paused_seconds
 
     def _maybe_advance_blind_level(self) -> None:
         """Check elapsed time and advance the blind level if needed."""
@@ -289,7 +301,7 @@ class GameEngine:
         ):
             return
 
-        elapsed_minutes = (time.time() - self.game_started_at) / 60.0
+        elapsed_minutes = self._effective_elapsed() / 60.0
         target_level = int(elapsed_minutes // self.blind_level_duration)
         # Clamp to last level in the schedule
         target_level = min(target_level, len(self.blind_schedule) - 1)
@@ -310,8 +322,10 @@ class GameEngine:
             return None
         if self.blind_level >= len(self.blind_schedule) - 1:
             return None  # already at max level
+        if self.paused:
+            return None  # don't show countdown while paused
         next_level = self.blind_level + 1
-        return self.game_started_at + (next_level * self.blind_level_duration * 60)
+        return self.game_started_at + self.total_paused_seconds + (next_level * self.blind_level_duration * 60)
 
     # ------------------------------------------------------------------
     # Hand Lifecycle
@@ -858,6 +872,28 @@ class GameEngine:
         self.shown_cards.add(player_id)
         return self._build_state(showdown=True)
 
+    def pause(self) -> dict[str, Any]:
+        """Pause the game. Stops timers."""
+        if self.paused:
+            raise ValueError("Game is already paused")
+        if self.hand_active:
+            raise ValueError("Cannot pause during an active hand")
+        self.paused = True
+        self.paused_at = time.time()
+        self.auto_deal_deadline = None
+        return self._build_state()
+
+    def unpause(self) -> dict[str, Any]:
+        """Unpause the game. Resumes timers."""
+        if not self.paused:
+            raise ValueError("Game is not paused")
+        if self.paused_at:
+            self.total_paused_seconds += time.time() - self.paused_at
+        self.paused = False
+        self.paused_at = None
+        self._set_auto_deal_deadline()
+        return self._build_state()
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
@@ -918,6 +954,8 @@ class GameEngine:
             "next_blind_change_at": self.get_next_blind_change_at(),
             "max_rebuys": self.max_rebuys,
             "rebuy_cutoff_minutes": self.rebuy_cutoff_minutes,
+            "paused": self.paused,
+            "total_paused_seconds": self.total_paused_seconds,
         }
 
     def get_player_view(self, player_id: str) -> dict[str, Any]:
@@ -1020,6 +1058,9 @@ class GameEngine:
             ],
             "hand_histories": [h.to_dict() for h in self.hand_histories],
             "shown_cards": list(self.shown_cards),
+            "paused": self.paused,
+            "paused_at": self.paused_at,
+            "total_paused_seconds": self.total_paused_seconds,
         }
 
     @classmethod
@@ -1057,6 +1098,9 @@ class GameEngine:
         engine.deck = Deck.from_dict(deck_data) if deck_data else None
         engine.current_history = None
         engine.shown_cards = set(data.get("shown_cards", []))
+        engine.paused = data.get("paused", False)
+        engine.paused_at = data.get("paused_at")
+        engine.total_paused_seconds = data.get("total_paused_seconds", 0)
 
         engine.seats = []
         for s in data["seats"]:

@@ -126,6 +126,16 @@ export function showCards(
   });
 }
 
+export function togglePause(
+  code: string,
+  data: { player_id: string; pin: string }
+): Promise<{ ok: boolean }> {
+  return request(`/api/games/${code}/pause`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 /** Build WebSocket URL for a game. */
 export function buildWsUrl(code: string, playerId: string): string {
   const wsBase =
