@@ -223,6 +223,12 @@ input::placeholder {
 
 .row > label {
   flex: 1;
+  min-width: 0;
+}
+
+.row > label > input {
+  width: 100%;
+  min-width: 0;
 }
 
 .checkbox-label {
