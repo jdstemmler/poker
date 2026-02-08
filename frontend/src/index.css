@@ -107,6 +107,8 @@ p {
   cursor: pointer;
   transition: all 0.15s ease;
   -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
   user-select: none;
   white-space: nowrap;
 }
@@ -1036,6 +1038,8 @@ input::placeholder {
   cursor: pointer;
   transition: all 0.15s;
   -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .btn-raise-confirm:active:not(:disabled) {
@@ -1130,6 +1134,8 @@ input::placeholder {
   cursor: pointer;
   transition: all 0.15s;
   -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
   min-height: 48px;
 }
 
@@ -1153,6 +1159,8 @@ input::placeholder {
   font-size: 1rem;
   font-weight: 600;
   background: var(--bg-elevated);
+  -webkit-appearance: none;
+  appearance: none;
   color: var(--text);
   border: 1px solid var(--border);
   cursor: pointer;
