@@ -798,6 +798,7 @@ class GameEngine:
             "last_raiser_idx": self.last_raiser_idx,
             "action_deadline": self.action_deadline,
             "community_cards": [c.to_dict() for c in self.community_cards],
+            "deck": self.deck.to_dict() if self.deck else None,
             "last_hand_result": self.last_hand_result,
             "seats": [
                 {
@@ -839,7 +840,8 @@ class GameEngine:
         engine.action_deadline = data.get("action_deadline")
         engine.community_cards = [Card.from_dict(c) for c in data["community_cards"]]
         engine.last_hand_result = data.get("last_hand_result")
-        engine.deck = None  # Deck is not persisted (new one each hand)
+        deck_data = data.get("deck")
+        engine.deck = Deck.from_dict(deck_data) if deck_data else None
         engine.current_history = None
 
         engine.seats = []

@@ -113,3 +113,12 @@ class Deck:
     @property
     def remaining(self) -> int:
         return len(self._cards)
+
+    def to_dict(self) -> dict:
+        return {"cards": [c.to_dict() for c in self._cards]}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Deck:
+        deck = cls.__new__(cls)
+        deck._cards = [Card.from_dict(c) for c in data["cards"]]
+        return deck
