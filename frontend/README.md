@@ -1,73 +1,230 @@
-# React + TypeScript + Vite
+# Frontend — Poker Game UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React single-page application providing the mobile-first interface for the poker game. Communicates with the backend via REST API and WebSocket for real-time updates.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+| Component | Version |
+|-----------|---------|
+| React | 19 |
+| TypeScript | ~5.9 |
+| Vite | 7 |
+| React Router | 7 |
+| Nginx | Alpine (production) |
 
-## React Compiler
+No additional UI libraries — all styling is hand-written CSS with a dark theme.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Project Structure
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+frontend/
+├── public/
+│   └── favicon.svg          # Playing cards SVG favicon
+├── src/
+│   ├── api.ts               # REST API client (all fetch calls)
+│   ├── types.ts             # TypeScript interfaces mirroring backend models
+│   ├── useGameSocket.ts     # WebSocket hook with auto-reconnection
+│   ├── App.tsx              # Router setup
+│   ├── main.tsx             # React entry point
+│   ├── index.css            # All styles (dark theme, responsive)
+│   ├── pages/
+│   │   ├── HomePage.tsx     # Landing page — create or join
+│   │   ├── CreateGamePage.tsx # Game configuration form
+│   │   ├── JoinGamePage.tsx # Enter name/PIN to join + spectator mode
+│   │   ├── LobbyPage.tsx   # Waiting room, ready up, start
+│   │   └── TablePage.tsx   # Main gameplay view (698 lines)
+│   └── components/
+│       ├── CardDisplay.tsx  # Playing card rendering (rank + suit)
+│       └── HelpModal.tsx    # In-game help overlay
+├── Dockerfile               # Multi-stage: Node build → Nginx serve
+├── nginx.conf               # Reverse proxy config for API/WS
+├── index.html               # SPA shell
+├── vite.config.ts           # Dev proxy for API/WS
+├── package.json
+├── tsconfig.json
+└── eslint.config.js
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Pages
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### `HomePage`
+Landing page with two options: **Create New Game** or **Join Game** (with optional game code input).
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### `CreateGamePage`
+Configuration form for new games with all settings:
+- Starting chips, small/big blind
+- Max players (2–9)
+- Rebuy settings (enable/disable, max count, time cutoff)
+- Turn timeout
+- Blind level duration
+- Input fields suppress password managers (custom autocomplete attributes)
+
+### `JoinGamePage`
+- Enter name and 4-digit PIN to join via game code
+- **Watch Game** button for spectator mode (generates random spectator ID)
+- Help modal explaining gameplay and spectating
+
+### `LobbyPage`
+Waiting room before the game starts:
+- Shows all joined players with ready status
+- Ready toggle button
+- Creator sees **Start Game** button (requires all players ready)
+- **Copy Join Link** for easy sharing
+- Real-time updates via WebSocket
+
+### `TablePage`
+The main gameplay view — the largest and most complex page:
+
+**Layout:**
+- **Header** — Game code, blind info, hamburger menu (Home, Create Game, Join Game), rebuy status indicator
+- **Community cards** — Displayed in the center during active hands
+- **Player list** — All players in consistent seat order with chips, bets, status indicators (dealer chip, action badges, fold/all-in/sitting-out states)
+- **Action tray** — Fold, Check/Call, Raise slider + All-In for the active player
+- **Between-hands section** — Deal button, show cards, rebuy options
+
+**Features:**
+- Pot and bet displays
+- Turn timer countdown bar
+- Auto-deal countdown
+- Blind level display with next-level timer
+- Pause/resume control (creator only)
+- Last hand result with winner info
+- Showdown card reveal
+- Voluntary card showing after hands
+- Rebuy button (queues during active hand, immediate between hands)
+- Cancel rebuy option
+- Game over overlay with ranked standings (trophy for winner)
+- Spectator mode (hidden hole cards, no action buttons, "Watching" badge)
+- "(you)" tag on own player row
+
+## Components
+
+### `CardDisplay`
+Renders a playing card as a compact square with rank and suit. Supports:
+- Face-up cards (colored by suit — red for hearts/diamonds, dark for clubs/spades)
+- Face-down cards (back design)
+- Responsive sizing via CSS classes
+
+### `HelpModal`
+Overlay explaining gameplay controls, hand rankings reference, and spectator mode. Toggled by the (?) button in the header.
+
+## Key Modules
+
+### `api.ts` — API Client
+Typed fetch wrapper for all backend endpoints:
+- `createGame()`, `joinGame()`, `getGame()`
+- `toggleReady()`, `startGame()`
+- `sendAction()`, `dealNextHand()`
+- `requestRebuy()`, `cancelRebuy()`
+- `showCards()`, `togglePause()`
+- `buildWsUrl()` — constructs WebSocket URL (auto-detects protocol)
+
+Uses `VITE_API_BASE` and `VITE_WS_BASE` environment variables (defaults to same origin).
+
+### `useGameSocket.ts` — WebSocket Hook
+Custom React hook providing real-time game state:
+- Automatic connection and reconnection with exponential backoff
+- Parses `game_state`, `lobby_state`, `connection_info`, and `ping` messages
+- Responds to server pings with pong
+- Returns current `EngineState` that triggers re-renders on updates
+- Cleans up on unmount
+
+### `types.ts` — Type Definitions
+TypeScript interfaces mirroring the backend's JSON structures:
+- `EngineState` — Full game state (50+ fields)
+- `EnginePlayer` — Per-player state (chips, bets, flags, actions)
+- `CardData` — Card rank + suit
+- `ValidAction` — Available actions with min/max amounts
+- `HandResult` — Winner info, pot, player hands
+- `FinalStanding` — End-of-game ranking
+- `GameState`, `GameSettings`, `PlayerInfo` — Lobby types
+- `WsMessage`, `ConnectionInfo` — WebSocket message types
+
+### `index.css` — Styles
+All CSS in a single file (1,800+ lines):
+- Dark theme with CSS custom properties
+- Mobile-first responsive design
+- Card styling (compact square layout, suit colors)
+- Player row states (active, folded, all-in, sitting out, winner)
+- Action button styling (fold=red, check/call=green, raise=blue)
+- Raise slider
+- Timer animation bars
+- Hamburger menu
+- Game over standings overlay
+- Spectator badge
+- Lobby and form styles
+
+## Development
+
+### Setup
+
+```bash
+cd frontend
+npm install
 ```
+
+### Run (Development)
+
+```bash
+npm run dev
+```
+
+Dev server runs on `http://localhost:5173` with HMR. The Vite config proxies `/api/*` and `/ws/*` to `http://localhost:8000` automatically.
+
+To point at a different backend:
+
+```bash
+VITE_API_BASE=http://192.168.1.100:8000 VITE_WS_BASE=ws://192.168.1.100:8000 npm run dev
+```
+
+### Build
+
+```bash
+npm run build
+```
+
+Produces optimized static files in `dist/`.
+
+### Lint
+
+```bash
+npm run lint
+```
+
+### Docker
+
+The Dockerfile uses a multi-stage build:
+
+1. **Build stage** — `node:20-alpine`, runs `npm ci` + `npm run build`
+2. **Serve stage** — `nginx:alpine`, serves `dist/` with custom `nginx.conf`
+
+```bash
+docker build -t poker-frontend .
+docker run -p 3000:3000 poker-frontend
+```
+
+## Nginx Configuration
+
+The production nginx config (`nginx.conf`) handles three concerns:
+
+| Path | Behavior |
+|------|----------|
+| `/api/*` | Proxied to `http://backend:8000` |
+| `/ws/*` | Proxied with WebSocket upgrade headers, 24h read timeout |
+| `/*` | Serves static files with SPA fallback (`try_files → /index.html`) |
+
+## Session Storage
+
+Player identity is stored in `sessionStorage` (per-tab):
+- `player_id` — UUID assigned on join
+- `player_pin` — 4-digit PIN (sent with authenticated requests)
+- `game_code` — Current game code
+- `player_name` — Display name
+- `is_spectator` — Whether viewing as spectator
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_BASE` | `""` (same origin) | Backend API base URL |
+| `VITE_WS_BASE` | Auto-detected | WebSocket base URL (ws/wss based on page protocol) |

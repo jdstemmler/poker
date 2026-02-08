@@ -15,6 +15,7 @@ A self-hosted, mobile-first web application for playing **No-Limit Texas Hold'em
 - **Voluntary card reveal** — Cards hidden by default after each hand; players choose whether to show
 - **Spectator mode** — Watch a game without joining (via the Join page)
 - **Rebuys** — Optional rebuy when busted, with configurable max count and time cutoff
+- **Elimination tracking** — Ranked final standings at game over (add on bust, remove on rebuy)
 - **Copy join link** — One-tap share link from the lobby
 - **Last action tracking** — See each player's most recent action at the table
 - **Stale game cleanup** — Background task auto-deletes inactive games after 24 hours
@@ -84,7 +85,7 @@ source .venv/bin/activate
 python -m pytest tests/ -v
 ```
 
-The test suite (210 tests) covers cards, hand evaluation, game engine, betting actions, serialization, business logic, and API endpoints. No running Redis is required — external dependencies are mocked.
+The test suite (237 tests) covers cards, hand evaluation, game engine, betting actions, serialization, business logic, and API endpoints. No running Redis is required — external dependencies are mocked.
 
 ### Frontend
 
@@ -163,6 +164,7 @@ VITE_API_BASE=http://localhost:8000 VITE_WS_BASE=ws://localhost:8000 npm run dev
 | `POST` | `/api/games/{code}/action` | Submit action (fold/check/call/raise/all_in) |
 | `POST` | `/api/games/{code}/deal` | Deal next hand (any player) |
 | `POST` | `/api/games/{code}/rebuy` | Request a rebuy |
+| `POST` | `/api/games/{code}/cancel_rebuy` | Cancel a queued rebuy |
 | `POST` | `/api/games/{code}/show_cards` | Voluntarily reveal cards after a hand |
 | `POST` | `/api/games/{code}/pause` | Toggle pause (creator only) |
 
