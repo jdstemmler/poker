@@ -11,6 +11,8 @@ export default function CreateGamePage() {
   const [bigBlind, setBigBlind] = useState(20);
   const [maxPlayers, setMaxPlayers] = useState(9);
   const [allowRebuys, setAllowRebuys] = useState(true);
+  const [maxRebuys, setMaxRebuys] = useState(1);
+  const [rebuyCutoffMinutes, setRebuyCutoffMinutes] = useState(60);
   const [turnTimeout, setTurnTimeout] = useState(0);
   const [blindLevelDuration, setBlindLevelDuration] = useState(0);
   const [error, setError] = useState("");
@@ -29,6 +31,8 @@ export default function CreateGamePage() {
         big_blind: bigBlind,
         max_players: maxPlayers,
         allow_rebuys: allowRebuys,
+        max_rebuys: allowRebuys ? maxRebuys : 0,
+        rebuy_cutoff_minutes: allowRebuys ? rebuyCutoffMinutes : 0,
         turn_timeout: turnTimeout,
         blind_level_duration: blindLevelDuration,
       });
@@ -160,6 +164,36 @@ export default function CreateGamePage() {
             />
             Allow Rebuys
           </label>
+
+          {allowRebuys && (
+            <div className="row rebuy-options">
+              <label>
+                Max Rebuys
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={maxRebuys}
+                  onChange={(e) => setMaxRebuys(Number(e.target.value))}
+                  placeholder="0 = unlimited"
+                />
+                <span className="hint">{maxRebuys === 0 ? "Unlimited" : `${maxRebuys} allowed`}</span>
+              </label>
+              <label>
+                Rebuy Cutoff (min)
+                <input
+                  type="number"
+                  min={0}
+                  max={480}
+                  step={5}
+                  value={rebuyCutoffMinutes}
+                  onChange={(e) => setRebuyCutoffMinutes(Number(e.target.value))}
+                  placeholder="0 = no cutoff"
+                />
+                <span className="hint">{rebuyCutoffMinutes === 0 ? "No cutoff" : `${rebuyCutoffMinutes} min`}</span>
+              </label>
+            </div>
+          )}
         </fieldset>
 
         {error && <p className="error">{error}</p>}

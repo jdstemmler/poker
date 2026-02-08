@@ -25,6 +25,8 @@ class CreateGameRequest(BaseModel):
     big_blind: int = Field(default=20, ge=2)
     max_players: int = Field(default=9, ge=4, le=9)
     allow_rebuys: bool = Field(default=True)
+    max_rebuys: int = Field(default=1, ge=0, le=99)  # 0 = unlimited
+    rebuy_cutoff_minutes: int = Field(default=60, ge=0, le=480)  # 0 = no cutoff
     turn_timeout: int = Field(default=0, ge=0, le=300)  # seconds, 0 = no timer
     blind_level_duration: int = Field(default=0, ge=0, le=120)  # minutes, 0 = disabled
 
@@ -63,6 +65,8 @@ class GameSettings(BaseModel):
     big_blind: int
     max_players: int
     allow_rebuys: bool
+    max_rebuys: int = 1  # 0 = unlimited
+    rebuy_cutoff_minutes: int = 60  # 0 = no cutoff
     turn_timeout: int = 0  # seconds, 0 = no timer
     blind_level_duration: int = 0  # minutes, 0 = disabled
 

@@ -32,6 +32,8 @@ export function createGame(data: {
   big_blind?: number;
   max_players?: number;
   allow_rebuys?: boolean;
+  max_rebuys?: number;
+  rebuy_cutoff_minutes?: number;
   turn_timeout?: number;
   blind_level_duration?: number;
 }): Promise<CreateGameResponse> {

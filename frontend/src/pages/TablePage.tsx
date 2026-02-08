@@ -388,6 +388,7 @@ export default function TablePage() {
               {me.folded && <span className="status-tag folded-tag">Folded</span>}
               {me.all_in && <span className="status-tag allin-tag">All-In</span>}
               {me.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
+              {me.rebuy_count > 0 && <span className="status-tag rebuy-tag">🔄 {me.rebuy_count}</span>}
               {me.bet_this_hand > 0 && <span className="status-tag bet-tag">Pot: {me.bet_this_hand}</span>}
             </div>
           </div>
@@ -415,6 +416,7 @@ export default function TablePage() {
                 {p.folded && <span className="status-tag folded-tag">Folded</span>}
                 {p.all_in && <span className="status-tag allin-tag">All-In</span>}
                 {p.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
+                {p.rebuy_count > 0 && <span className="status-tag rebuy-tag">🔄 {p.rebuy_count}</span>}
                 {p.bet_this_hand > 0 && <span className="status-tag bet-tag">Pot: {p.bet_this_hand}</span>}
                 {engine.showdown && p.hole_cards && !p.folded && engine.shown_cards?.includes(p.player_id) && (
                   <CardList cards={p.hole_cards} size="sm" />

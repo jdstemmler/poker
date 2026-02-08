@@ -866,6 +866,15 @@ input::placeholder {
   color: var(--accent);
 }
 
+.rebuy-tag {
+  background: #1a3a1a;
+  color: #4caf50;
+}
+
+.rebuy-options {
+  margin-top: 0.25rem;
+}
+
 /* Hand Result */
 .hand-result {
   margin: 0 1rem;

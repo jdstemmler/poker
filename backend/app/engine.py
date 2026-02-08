@@ -45,6 +45,7 @@ class PlayerState:
         self.has_acted: bool = False
         self.is_sitting_out: bool = False
         self.last_action: str = ""
+        self.rebuy_count: int = 0
 
     @property
     def is_active(self) -> bool:
@@ -75,6 +76,7 @@ class PlayerState:
             "all_in": self.all_in,
             "is_sitting_out": self.is_sitting_out,
             "last_action": self.last_action,
+            "rebuy_count": self.rebuy_count,
         }
         if reveal_cards and self.hole_cards:
             d["hole_cards"] = [c.to_dict() for c in self.hole_cards]
@@ -146,11 +148,15 @@ class GameEngine:
         turn_timeout: int = 0,
         blind_level_duration: int = 0,
         blind_schedule: list[tuple[int, int]] | None = None,
+        max_rebuys: int = 1,
+        rebuy_cutoff_minutes: int = 60,
     ) -> None:
         self.game_code = game_code
         self.small_blind = small_blind
         self.big_blind = big_blind
         self.allow_rebuys = allow_rebuys
+        self.max_rebuys = max_rebuys  # 0 = unlimited
+        self.rebuy_cutoff_minutes = rebuy_cutoff_minutes  # 0 = no cutoff
         self.starting_chips = starting_chips
         self.turn_timeout = turn_timeout  # 0 = no timer
 
@@ -816,8 +822,26 @@ class GameEngine:
         if p.chips > 0:
             raise ValueError("Player still has chips")
 
+        # Enforce rebuy limit (0 = unlimited)
+        if self.max_rebuys > 0 and p.rebuy_count >= self.max_rebuys:
+            raise ValueError(
+                f"Maximum rebuys ({self.max_rebuys}) reached"
+            )
+
+        # Enforce cutoff time (0 = no cutoff)
+        if (
+            self.rebuy_cutoff_minutes > 0
+            and self.game_started_at is not None
+        ):
+            elapsed = (time.time() - self.game_started_at) / 60.0
+            if elapsed >= self.rebuy_cutoff_minutes:
+                raise ValueError(
+                    f"Rebuy window has closed ({self.rebuy_cutoff_minutes} min)"
+                )
+
         p.chips = self.starting_chips
         p.is_sitting_out = False
+        p.rebuy_count += 1
         return self._build_state()
 
     def show_cards(self, player_id: str) -> dict[str, Any]:
@@ -892,6 +916,8 @@ class GameEngine:
             "blind_level_duration": self.blind_level_duration,
             "blind_schedule": [[sb, bb] for sb, bb in self.blind_schedule] if self.blind_schedule else [],
             "next_blind_change_at": self.get_next_blind_change_at(),
+            "max_rebuys": self.max_rebuys,
+            "rebuy_cutoff_minutes": self.rebuy_cutoff_minutes,
         }
 
     def get_player_view(self, player_id: str) -> dict[str, Any]:
@@ -952,6 +978,8 @@ class GameEngine:
             "small_blind": self.small_blind,
             "big_blind": self.big_blind,
             "allow_rebuys": self.allow_rebuys,
+            "max_rebuys": self.max_rebuys,
+            "rebuy_cutoff_minutes": self.rebuy_cutoff_minutes,
             "starting_chips": self.starting_chips,
             "turn_timeout": self.turn_timeout,
             "dealer_idx": self.dealer_idx,
@@ -986,6 +1014,7 @@ class GameEngine:
                     "has_acted": p.has_acted,
                     "is_sitting_out": p.is_sitting_out,
                     "last_action": p.last_action,
+                    "rebuy_count": p.rebuy_count,
                 }
                 for p in self.seats
             ],
@@ -1001,6 +1030,8 @@ class GameEngine:
         engine.small_blind = data["small_blind"]
         engine.big_blind = data["big_blind"]
         engine.allow_rebuys = data["allow_rebuys"]
+        engine.max_rebuys = data.get("max_rebuys", 1)
+        engine.rebuy_cutoff_minutes = data.get("rebuy_cutoff_minutes", 60)
         engine.starting_chips = data["starting_chips"]
         engine.turn_timeout = data.get("turn_timeout", 0)
         engine.dealer_idx = data["dealer_idx"]
@@ -1038,6 +1069,7 @@ class GameEngine:
             ps.has_acted = s["has_acted"]
             ps.is_sitting_out = s["is_sitting_out"]
             ps.last_action = s.get("last_action", "")
+            ps.rebuy_count = s.get("rebuy_count", 0)
             engine.seats.append(ps)
 
         engine.hand_histories = []

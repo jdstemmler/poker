@@ -16,6 +16,8 @@ export interface GameSettings {
   big_blind: number;
   max_players: number;
   allow_rebuys: boolean;
+  max_rebuys: number;
+  rebuy_cutoff_minutes: number;
   turn_timeout: number;
   blind_level_duration: number;
 }
@@ -56,6 +58,7 @@ export interface EnginePlayer {
   all_in: boolean;
   is_sitting_out: boolean;
   last_action: string;
+  rebuy_count: number;
   hole_cards?: CardData[];
 }
 
@@ -115,6 +118,8 @@ export interface EngineState {
   blind_level_duration: number;
   blind_schedule: number[][];
   next_blind_change_at: number | null;
+  max_rebuys: number;
+  rebuy_cutoff_minutes: number;
 }
 
 /** WebSocket message wrapper. */

@@ -53,6 +53,8 @@ async def create_game(req: CreateGameRequest) -> tuple[str, str, GameState]:
             "big_blind": req.big_blind,
             "max_players": req.max_players,
             "allow_rebuys": req.allow_rebuys,
+            "max_rebuys": req.max_rebuys,
+            "rebuy_cutoff_minutes": req.rebuy_cutoff_minutes,
             "turn_timeout": req.turn_timeout,
             "blind_level_duration": req.blind_level_duration,
         },
@@ -172,6 +174,8 @@ async def start_game(code: str, player_id: str, pin: str) -> GameState:
         small_blind=game_data["settings"]["small_blind"],
         big_blind=game_data["settings"]["big_blind"],
         allow_rebuys=game_data["settings"]["allow_rebuys"],
+        max_rebuys=game_data["settings"].get("max_rebuys", 1),
+        rebuy_cutoff_minutes=game_data["settings"].get("rebuy_cutoff_minutes", 60),
         turn_timeout=game_data["settings"].get("turn_timeout", 0),
         blind_level_duration=game_data["settings"].get("blind_level_duration", 0),
     )
