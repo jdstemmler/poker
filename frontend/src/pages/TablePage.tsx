@@ -305,11 +305,21 @@ export default function TablePage() {
   const raiseAction = engine.valid_actions.find((a) => a.action === "raise");
   const allInAction = engine.valid_actions.find((a) => a.action === "all_in");
 
+  // Raise step size — use big blind as the natural increment, minimum 5
+  const raiseStep = raiseAction ? Math.max(5, engine.big_blind) : 5;
+  const snapToStep = (value: number) => {
+    if (!raiseAction) return value;
+    const min = raiseAction.min_amount ?? 0;
+    const max = raiseAction.max_amount ?? 0;
+    const snapped = Math.round((value - min) / raiseStep) * raiseStep + min;
+    return Math.min(Math.max(snapped, min), max);
+  };
+
   // Raise presets
   const raisePresets = raiseAction ? [
     { label: "Min", value: raiseAction.min_amount ?? 0 },
-    { label: "½ Pot", value: Math.min(Math.max(Math.floor(engine.pot / 2), raiseAction.min_amount ?? 0), raiseAction.max_amount ?? 0) },
-    { label: "Pot", value: Math.min(engine.pot, raiseAction.max_amount ?? 0) },
+    { label: "½ Pot", value: snapToStep(Math.floor(engine.pot / 2)) },
+    { label: "Pot", value: snapToStep(engine.pot) },
     { label: "All-In", value: raiseAction.max_amount ?? 0 },
   ] : [];
 
@@ -479,6 +489,7 @@ export default function TablePage() {
                 type="range"
                 min={raiseAction.min_amount}
                 max={raiseAction.max_amount}
+                step={raiseStep}
                 value={raiseAmount}
                 onChange={(e) => setRaiseAmount(Number(e.target.value))}
                 className="raise-slider"
