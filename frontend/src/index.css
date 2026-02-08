@@ -936,6 +936,8 @@ input::placeholder {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   z-index: 20;
   margin-top: auto;
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
 }
 
 /* Raise Panel */
@@ -1054,6 +1056,9 @@ input::placeholder {
 .action-bar {
   display: flex;
   gap: 0.5rem;
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  will-change: contents;
 }
 
 .action-bar .btn {
@@ -1063,8 +1068,11 @@ input::placeholder {
   font-weight: 700;
   border-radius: var(--radius-sm);
   min-height: 48px; /* touch target */
-  -webkit-transform: translateZ(0); /* force GPU layer — fixes iOS repaint bug in sticky containers */
+  -webkit-transform: translateZ(0);
   transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: background-color;
 }
 
 .btn-fold {
