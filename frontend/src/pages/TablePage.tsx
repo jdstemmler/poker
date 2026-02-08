@@ -572,7 +572,7 @@ export default function TablePage() {
         )}
 
         {/* Queue rebuy during active hand for busted players */}
-        {engine.hand_active && me && me.chips === 0 && (me.is_sitting_out || me.folded || me.all_in) && (
+        {engine.hand_active && me && me.chips === 0 && (me.can_rebuy || me.rebuy_queued) && (me.is_sitting_out || me.folded || me.all_in) && (
           <div className="action-bar">
             {me.rebuy_queued ? (
               <button className="btn btn-cancel-rebuy" onClick={doCancelRebuy} disabled={actionLoading}>
@@ -597,7 +597,7 @@ export default function TablePage() {
                 {engine.paused ? "▶ Resume" : "⏸ Pause"}
               </button>
             )}
-            {me && me.chips === 0 && (
+            {me && me.chips === 0 && me.can_rebuy && (
               <button className="btn btn-rebuy" onClick={doRebuy} disabled={actionLoading}>
                 Rebuy
               </button>

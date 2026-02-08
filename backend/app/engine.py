@@ -346,9 +346,9 @@ class GameEngine:
                 p.rebuy_count += 1
                 p.rebuy_queued = False
 
-        # Eliminate busted players (chips == 0 and no rebuys)
+        # Eliminate busted players
         for p in self.seats:
-            if p.chips <= 0 and not self.allow_rebuys:
+            if p.chips <= 0 and not self._can_rebuy(p) and not p.rebuy_queued:
                 p.is_sitting_out = True
 
         live_players = [i for i, p in enumerate(self.seats) if not p.is_sitting_out]
@@ -902,6 +902,23 @@ class GameEngine:
     # Rebuy
     # ------------------------------------------------------------------
 
+    def _can_rebuy(self, p: PlayerState) -> bool:
+        """Check if a busted player is eligible to rebuy (ignoring hand_active)."""
+        if not self.allow_rebuys:
+            return False
+        if p.chips > 0:
+            return False
+        if self.max_rebuys > 0 and p.rebuy_count >= self.max_rebuys:
+            return False
+        if (
+            self.rebuy_cutoff_minutes > 0
+            and self.game_started_at is not None
+        ):
+            elapsed = (time.time() - self.game_started_at) / 60.0
+            if elapsed >= self.rebuy_cutoff_minutes:
+                return False
+        return True
+
     def rebuy(self, player_id: str) -> dict[str, Any]:
         """Allow a busted player to rebuy (if enabled).
 
@@ -1035,7 +1052,8 @@ class GameEngine:
             "message": message,
             "last_hand_result": self.last_hand_result,
             "players": [
-                p.to_dict(reveal_cards=showdown or p.player_id in self.shown_cards)
+                {**p.to_dict(reveal_cards=showdown or p.player_id in self.shown_cards),
+                 "can_rebuy": self._can_rebuy(p)}
                 for p in self.seats
             ],
             # Showdown reveals all non-folded cards

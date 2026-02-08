@@ -594,6 +594,56 @@ class TestRebuy:
         with pytest.raises(ValueError, match="not found"):
             e.rebuy("nonexistent")
 
+    def test_busted_player_eliminated_after_cutoff_expires(self):
+        """When rebuy cutoff expires, busted players should be eliminated on next hand."""
+        e = _make_engine(2, starting_chips=100, allow_rebuys=True, rebuy_cutoff_minutes=1)
+        _deal_and_get(e)
+        self._end_hand(e)
+        # Bust p0
+        e.seats[0].chips = 0
+        # Simulate cutoff expired (2 minutes past)
+        e.game_started_at = time.time() - 120
+        # Start new hand — should trigger game over
+        state = e.start_new_hand()
+        assert state["game_over"] is True
+        assert e.seats[0].is_sitting_out is True
+
+    def test_busted_player_eliminated_after_max_rebuys(self):
+        """When max rebuys reached, busted player should be eliminated on next hand."""
+        e = _make_engine(2, starting_chips=100, allow_rebuys=True, max_rebuys=1)
+        _deal_and_get(e)
+        self._end_hand(e)
+        e.seats[0].chips = 0
+        e.rebuy("p0")
+        e.start_new_hand()
+        self._end_hand(e)
+        e.seats[0].chips = 0
+        # At max rebuys, start_new_hand should eliminate p0
+        state = e.start_new_hand()
+        assert state["game_over"] is True
+        assert e.seats[0].is_sitting_out is True
+
+    def test_can_rebuy_field_in_state(self):
+        """State broadcast should include can_rebuy per player."""
+        e = _make_engine(2, starting_chips=100, allow_rebuys=True, rebuy_cutoff_minutes=60)
+        _deal_and_get(e)
+        self._end_hand(e)
+        e.seats[0].chips = 0
+        state = e._build_state()
+        p0_state = [p for p in state["players"] if p["player_id"] == "p0"][0]
+        assert p0_state["can_rebuy"] is True
+
+    def test_can_rebuy_false_after_cutoff(self):
+        """can_rebuy should be False after cutoff expires."""
+        e = _make_engine(2, starting_chips=100, allow_rebuys=True, rebuy_cutoff_minutes=1)
+        _deal_and_get(e)
+        self._end_hand(e)
+        e.seats[0].chips = 0
+        e.game_started_at = time.time() - 120
+        state = e._build_state()
+        p0_state = [p for p in state["players"] if p["player_id"] == "p0"][0]
+        assert p0_state["can_rebuy"] is False
+
 
 # ── Show cards ───────────────────────────────────────────────────────
 

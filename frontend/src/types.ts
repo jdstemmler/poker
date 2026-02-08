@@ -60,6 +60,7 @@ export interface EnginePlayer {
   last_action: string;
   rebuy_count: number;
   rebuy_queued: boolean;
+  can_rebuy: boolean;
   hole_cards?: CardData[];
 }
 
