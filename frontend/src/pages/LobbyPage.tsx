@@ -11,6 +11,7 @@ export default function LobbyPage() {
   const [connInfo, setConnInfo] = useState<ConnectionInfo | null>(null);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const playerId = sessionStorage.getItem("playerId");
   const playerPin = sessionStorage.getItem("playerPin");
@@ -127,6 +128,18 @@ export default function LobbyPage() {
           <span className="lobby-code-value">{game.code}</span>
           <span className="lobby-code-hint">Share this code with friends</span>
         </div>
+        <button
+          className="btn btn-secondary btn-copy-link"
+          onClick={() => {
+            const url = `${window.location.origin}/join/${game.code}`;
+            navigator.clipboard.writeText(url).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            });
+          }}
+        >
+          {copied ? "✓ Copied!" : "Copy Join Link"}
+        </button>
         <span className={`conn-status-pill ${connected ? "on" : "off"}`}>
           <span className="conn-dot-sm" />
           {connected ? "Connected" : "Disconnected"}

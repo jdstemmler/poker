@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { joinGame } from "../api";
 
 export default function JoinGamePage() {
   const navigate = useNavigate();
-  const [code, setCode] = useState("");
+  const { code: urlCode } = useParams<{ code?: string }>();
+  const [code, setCode] = useState(urlCode?.toUpperCase() ?? "");
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");

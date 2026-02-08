@@ -351,6 +351,11 @@ input::placeholder {
   color: var(--text-dim);
 }
 
+.btn-copy-link {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.9rem;
+}
+
 .conn-status-pill {
   display: inline-flex;
   align-items: center;

@@ -12,6 +12,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/create" element={<CreateGamePage />} />
         <Route path="/join" element={<JoinGamePage />} />
+        <Route path="/join/:code" element={<JoinGamePage />} />
         <Route path="/game/:code" element={<LobbyPage />} />
         <Route path="/game/:code/table" element={<TablePage />} />
       </Routes>
