@@ -350,12 +350,7 @@ input::placeholder {
   font-size: 0.8rem;
   color: var(--text-dim);
   text-decoration: none;
-  opacity: 0.5;
-  transition: opacity 0.2s;
-}
-
-.coffee-link:hover {
-  opacity: 0.85;
+  opacity: 1;
 }
 
 /* ===== Help Button & Modal ===== */
@@ -1409,6 +1404,41 @@ input::placeholder {
 }
 
 .btn-rebuy:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-cancel-rebuy {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  background: var(--bg-elevated);
+  -webkit-appearance: none;
+  appearance: none;
+  color: var(--accent-red);
+  border: 1px solid var(--accent-red);
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: background-color;
+  min-height: 48px;
+}
+
+.btn-cancel-rebuy:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-cancel-rebuy:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }

@@ -176,6 +176,20 @@ async def rebuy(code: str, req: RebuyRequest):
     return {"ok": True}
 
 
+@app.post("/api/games/{code}/cancel_rebuy")
+async def cancel_rebuy(code: str, req: RebuyRequest):
+    """Cancel a queued rebuy."""
+    try:
+        result = await game_manager.cancel_rebuy(
+            code.upper(), req.player_id, req.pin
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await _broadcast_engine_state(code.upper())
+    return {"ok": True}
+
+
 class ShowCardsRequest(BaseModel):
     player_id: str
     pin: str = Field(..., pattern=r"^\d{4}$")

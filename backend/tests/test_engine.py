@@ -444,11 +444,82 @@ class TestRebuy:
         with pytest.raises(ValueError, match="not allowed"):
             e.rebuy("p0")
 
-    def test_rebuy_during_hand_fails(self):
+    def test_rebuy_during_hand_queues(self):
         e = _make_engine(3, allow_rebuys=True)
         _deal_and_get(e)
         e.seats[0].chips = 0
-        with pytest.raises(ValueError, match="during a hand"):
+        e.seats[0].folded = True
+        e.rebuy("p0")
+        assert e.seats[0].rebuy_queued is True
+        assert e.seats[0].chips == 0  # not yet restored
+
+    def test_queued_rebuy_processed_on_new_hand(self):
+        e = _make_engine(3, starting_chips=100, allow_rebuys=True)
+        _deal_and_get(e)
+        # End the hand first
+        self._end_hand(e)
+        # Start a new hand
+        e.start_new_hand()
+        # Now during this hand, bust p0 and queue a rebuy
+        e.seats[0].chips = 0
+        e.seats[0].folded = True
+        e.rebuy("p0")  # queues during hand
+        assert e.seats[0].rebuy_queued is True
+        # End this hand
+        self._end_hand(e)
+        # Now deal the next hand — queued rebuy should be processed
+        e.start_new_hand()
+        assert e.seats[0].chips > 0  # restored (minus any blind posted)
+        assert e.seats[0].rebuy_count == 1
+        assert e.seats[0].rebuy_queued is False
+        assert e.seats[0].is_sitting_out is False
+
+    def test_double_queue_rebuy_fails(self):
+        e = _make_engine(3, allow_rebuys=True)
+        _deal_and_get(e)
+        e.seats[0].chips = 0
+        e.seats[0].folded = True
+        e.rebuy("p0")
+        with pytest.raises(ValueError, match="already queued"):
+            e.rebuy("p0")
+
+    def test_cancel_queued_rebuy(self):
+        e = _make_engine(3, allow_rebuys=True)
+        _deal_and_get(e)
+        e.seats[0].chips = 0
+        e.seats[0].folded = True
+        e.rebuy("p0")
+        assert e.seats[0].rebuy_queued is True
+        e.cancel_rebuy("p0")
+        assert e.seats[0].rebuy_queued is False
+
+    def test_cancel_rebuy_when_none_queued_fails(self):
+        e = _make_engine(3, allow_rebuys=True)
+        _deal_and_get(e)
+        with pytest.raises(ValueError, match="No rebuy queued"):
+            e.cancel_rebuy("p0")
+
+    def test_queued_rebuy_respects_max_rebuys(self):
+        e = _make_engine(3, starting_chips=100, allow_rebuys=True, max_rebuys=1)
+        _deal_and_get(e)
+        self._end_hand(e)
+        e.seats[0].chips = 0
+        e.rebuy("p0")  # immediate rebuy (between hands)
+        assert e.seats[0].rebuy_count == 1
+        # Queue during next hand should fail — already at max
+        e.start_new_hand()
+        e.seats[0].chips = 0
+        e.seats[0].folded = True
+        with pytest.raises(ValueError, match="Maximum rebuys"):
+            e.rebuy("p0")
+
+    def test_queued_rebuy_respects_cutoff(self):
+        e = _make_engine(3, starting_chips=100, allow_rebuys=True, rebuy_cutoff_minutes=1)
+        _deal_and_get(e)
+        e.seats[0].chips = 0
+        e.seats[0].folded = True
+        e.game_started_at = time.time() - 120
+        with pytest.raises(ValueError, match="window has closed"):
             e.rebuy("p0")
 
     def test_rebuy_with_chips_remaining_fails(self):

@@ -8,6 +8,7 @@ import {
   sendAction,
   dealNextHand,
   requestRebuy,
+  cancelRebuy,
   showCards,
   getGame,
   togglePause,
@@ -272,6 +273,19 @@ export default function TablePage() {
     }
   };
 
+  const doCancelRebuy = async () => {
+    if (!code || !playerId || !playerPin) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      await cancelRebuy(code, { player_id: playerId, pin: playerPin });
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const doShowCards = async () => {
     if (!code || !playerId || !playerPin) return;
     setActionLoading(true);
@@ -422,6 +436,7 @@ export default function TablePage() {
               {me.folded && <span className="status-tag folded-tag">Folded</span>}
               {me.all_in && <span className="status-tag allin-tag">All-In</span>}
               {me.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
+              {me.rebuy_queued && <span className="status-tag rebuy-tag">Rebuy Queued</span>}
               {me.rebuy_count > 0 && <span className="status-tag rebuy-tag">🔄 {me.rebuy_count}</span>}
             </div>
             <div className="player-right">
@@ -450,6 +465,7 @@ export default function TablePage() {
                 {p.folded && <span className="status-tag folded-tag">Folded</span>}
                 {p.all_in && <span className="status-tag allin-tag">All-In</span>}
                 {p.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
+                {p.rebuy_queued && <span className="status-tag rebuy-tag">Rebuy Queued</span>}
                 {p.rebuy_count > 0 && <span className="status-tag rebuy-tag">🔄 {p.rebuy_count}</span>}
               </div>
               <div className="player-right">
@@ -551,6 +567,21 @@ export default function TablePage() {
                 <button className="btn btn-check" disabled>Check</button>
                 <button className="btn btn-raise" disabled>Raise</button>
               </>
+            )}
+          </div>
+        )}
+
+        {/* Queue rebuy during active hand for busted players */}
+        {engine.hand_active && me && me.chips === 0 && (me.is_sitting_out || me.folded || me.all_in) && (
+          <div className="action-bar">
+            {me.rebuy_queued ? (
+              <button className="btn btn-cancel-rebuy" onClick={doCancelRebuy} disabled={actionLoading}>
+                Cancel Queued Rebuy
+              </button>
+            ) : (
+              <button className="btn btn-rebuy" onClick={doRebuy} disabled={actionLoading}>
+                Queue Rebuy
+              </button>
             )}
           </div>
         )}

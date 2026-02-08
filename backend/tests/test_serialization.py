@@ -110,6 +110,18 @@ class TestEngineSerialization:
         assert e2.max_rebuys == 3
         assert e2.rebuy_cutoff_minutes == 45
 
+    def test_roundtrip_preserves_rebuy_queued(self):
+        e = _make_engine(3, allow_rebuys=True)
+        e.start_new_hand()
+        e.seats[0].chips = 0
+        e.seats[0].folded = True
+        e.rebuy("p0")
+        assert e.seats[0].rebuy_queued is True
+
+        data = e.to_dict()
+        e2 = GameEngine.from_dict(data)
+        assert e2.seats[0].rebuy_queued is True
+
     def test_roundtrip_preserves_shown_cards(self):
         e = _make_engine(3)
         e.start_new_hand()

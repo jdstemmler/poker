@@ -537,6 +537,56 @@ class TestRequestRebuy:
 
 
 # ---------------------------------------------------------------------------
+# cancel_rebuy
+# ---------------------------------------------------------------------------
+
+
+class TestCancelRebuy:
+    @pytest.fixture(autouse=True)
+    def _mock_redis(self):
+        with patch(f"{PATCH_BASE}.load_player", new_callable=AsyncMock) as m1, \
+             patch(f"{PATCH_BASE}.load_engine", new_callable=AsyncMock) as m2, \
+             patch(f"{PATCH_BASE}.store_engine", new_callable=AsyncMock) as m3, \
+             patch(f"{PATCH_BASE}.touch_activity", new_callable=AsyncMock) as m4:
+            self.load_player = m1
+            self.load_engine = m2
+            self.store_engine = m3
+            self.touch_activity = m4
+            yield
+
+    async def test_cancel_rebuy(self):
+        from app.engine import GameEngine
+        from app.game_manager import cancel_rebuy
+
+        e = GameEngine(
+            game_code="ABC123",
+            players=[
+                {"id": "p1", "name": "Alice"},
+                {"id": "p2", "name": "Bob"},
+            ],
+            starting_chips=1000,
+            small_blind=10,
+            big_blind=20,
+            allow_rebuys=True,
+        )
+        e.start_new_hand()
+        # Bust p1 and queue a rebuy
+        for s in e.seats:
+            if s.player_id == "p1":
+                s.chips = 0
+                s.folded = True
+        e.rebuy("p1")
+        assert e.seats[0].rebuy_queued is True
+
+        self.load_engine.return_value = e.to_dict()
+        self.load_player.return_value = _make_player_data("p1", "Alice", "1234")
+        result = await cancel_rebuy("ABC123", "p1", "1234")
+
+        self.store_engine.assert_awaited_once()
+        self.touch_activity.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
 # show_cards
 # ---------------------------------------------------------------------------
 

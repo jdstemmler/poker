@@ -46,6 +46,7 @@ class PlayerState:
         self.is_sitting_out: bool = False
         self.last_action: str = ""
         self.rebuy_count: int = 0
+        self.rebuy_queued: bool = False
 
     @property
     def is_active(self) -> bool:
@@ -60,6 +61,7 @@ class PlayerState:
         self.all_in = False
         self.has_acted = False
         self.last_action = ""
+        self.rebuy_queued = False
 
     def reset_for_new_round(self) -> None:
         self.bet_this_round = 0
@@ -80,6 +82,7 @@ class PlayerState:
             "is_sitting_out": self.is_sitting_out,
             "last_action": self.last_action,
             "rebuy_count": self.rebuy_count,
+            "rebuy_queued": self.rebuy_queued,
         }
         if reveal_cards and self.hole_cards:
             d["hole_cards"] = [c.to_dict() for c in self.hole_cards]
@@ -336,6 +339,14 @@ class GameEngine:
 
     def start_new_hand(self) -> dict[str, Any]:
         """Deal a new hand. Returns game state snapshot."""
+        # Process queued rebuys first
+        for p in self.seats:
+            if p.rebuy_queued:
+                p.chips = self.starting_chips
+                p.is_sitting_out = False
+                p.rebuy_count += 1
+                p.rebuy_queued = False
+
         # Eliminate busted players (chips == 0 and no rebuys)
         for p in self.seats:
             if p.chips <= 0 and not self.allow_rebuys:
@@ -827,11 +838,13 @@ class GameEngine:
     # ------------------------------------------------------------------
 
     def rebuy(self, player_id: str) -> dict[str, Any]:
-        """Allow a busted player to rebuy (if enabled)."""
+        """Allow a busted player to rebuy (if enabled).
+
+        If the hand is currently active, the rebuy is queued and will be
+        processed automatically at the start of the next hand.
+        """
         if not self.allow_rebuys:
             raise ValueError("Rebuys are not allowed")
-        if self.hand_active:
-            raise ValueError("Cannot rebuy during a hand")
 
         p = self._find_player(player_id)
         if p is None:
@@ -856,9 +869,26 @@ class GameEngine:
                     f"Rebuy window has closed ({self.rebuy_cutoff_minutes} min)"
                 )
 
+        if self.hand_active:
+            # Queue the rebuy — it will be processed when the next hand starts
+            if p.rebuy_queued:
+                raise ValueError("Rebuy already queued")
+            p.rebuy_queued = True
+            return self._build_state()
+
         p.chips = self.starting_chips
         p.is_sitting_out = False
         p.rebuy_count += 1
+        return self._build_state()
+
+    def cancel_rebuy(self, player_id: str) -> dict[str, Any]:
+        """Cancel a queued rebuy."""
+        p = self._find_player(player_id)
+        if p is None:
+            raise ValueError("Player not found")
+        if not p.rebuy_queued:
+            raise ValueError("No rebuy queued")
+        p.rebuy_queued = False
         return self._build_state()
 
     def show_cards(self, player_id: str) -> dict[str, Any]:
@@ -1056,6 +1086,7 @@ class GameEngine:
                     "is_sitting_out": p.is_sitting_out,
                     "last_action": p.last_action,
                     "rebuy_count": p.rebuy_count,
+                    "rebuy_queued": p.rebuy_queued,
                 }
                 for p in self.seats
             ],
@@ -1117,6 +1148,7 @@ class GameEngine:
             ps.is_sitting_out = s["is_sitting_out"]
             ps.last_action = s.get("last_action", "")
             ps.rebuy_count = s.get("rebuy_count", 0)
+            ps.rebuy_queued = s.get("rebuy_queued", False)
             engine.seats.append(ps)
 
         engine.hand_histories = []

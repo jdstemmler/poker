@@ -59,6 +59,7 @@ export interface EnginePlayer {
   is_sitting_out: boolean;
   last_action: string;
   rebuy_count: number;
+  rebuy_queued: boolean;
   hole_cards?: CardData[];
 }
 

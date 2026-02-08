@@ -304,6 +304,18 @@ async def request_rebuy(code: str, player_id: str, pin: str) -> dict[str, Any]:
     return result
 
 
+async def cancel_rebuy(code: str, player_id: str, pin: str) -> dict[str, Any]:
+    """Cancel a queued rebuy request."""
+    await verify_player(code, player_id, pin)
+
+    engine = await _load_engine(code)
+    result = engine.cancel_rebuy(player_id)
+    await _save_engine(code, engine)
+    await redis_client.touch_activity(code)
+
+    return result
+
+
 async def show_cards(code: str, player_id: str, pin: str) -> dict[str, Any]:
     """Allow a player to voluntarily show their cards after a hand."""
     await verify_player(code, player_id, pin)

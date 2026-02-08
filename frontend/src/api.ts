@@ -116,6 +116,16 @@ export function requestRebuy(
   });
 }
 
+export function cancelRebuy(
+  code: string,
+  data: { player_id: string; pin: string }
+): Promise<{ ok: boolean }> {
+  return request(`/api/games/${code}/cancel_rebuy`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export function showCards(
   code: string,
   data: { player_id: string; pin: string }
