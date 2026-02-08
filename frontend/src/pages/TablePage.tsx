@@ -412,21 +412,21 @@ export default function TablePage() {
         {/* My row always first */}
         {me && (
           <div className={`player-row table-player me ${engine.action_on === playerId ? "action-on" : ""} ${me.folded ? "folded" : ""}`}>
-            <div className="player-top">
+            <div className="player-left">
               <span className="player-identity">
                 <span className={`conn-dot ${connInfo?.connected_players.includes(me.player_id) ? "on" : "off"}`} />
                 {me.player_id === engine.dealer_player_id && <span className="dealer-chip">D</span>}
                 <span className="player-name">{me.name} <span className="you-tag">you</span></span>
               </span>
-              <span className="player-chips"><span className="chip-icon" />{me.chips}</span>
-            </div>
-            <div className="player-bottom">
               {me.last_action && <span className="status-tag action-tag">{me.last_action}</span>}
               {me.folded && <span className="status-tag folded-tag">Folded</span>}
               {me.all_in && <span className="status-tag allin-tag">All-In</span>}
               {me.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
               {me.rebuy_count > 0 && <span className="status-tag rebuy-tag">🔄 {me.rebuy_count}</span>}
+            </div>
+            <div className="player-right">
               {me.bet_this_hand > 0 && <span className="status-tag bet-tag">Pot: {me.bet_this_hand}</span>}
+              <span className="player-chips"><span className="chip-icon" />{me.chips}</span>
             </div>
           </div>
         )}
@@ -440,21 +440,21 @@ export default function TablePage() {
               key={p.player_id}
               className={`player-row table-player ${isAction ? "action-on" : ""} ${p.folded ? "folded" : ""}`}
             >
-              <div className="player-top">
+              <div className="player-left">
                 <span className="player-identity">
                   <span className={`conn-dot ${isOnline ? "on" : "off"}`} />
                   {isDealer && <span className="dealer-chip">D</span>}
                   <span className="player-name">{p.name}</span>
                 </span>
-                <span className="player-chips"><span className="chip-icon" />{p.chips}</span>
-              </div>
-              <div className="player-bottom">
                 {p.last_action && <span className="status-tag action-tag">{p.last_action}</span>}
                 {p.folded && <span className="status-tag folded-tag">Folded</span>}
                 {p.all_in && <span className="status-tag allin-tag">All-In</span>}
                 {p.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
                 {p.rebuy_count > 0 && <span className="status-tag rebuy-tag">🔄 {p.rebuy_count}</span>}
+              </div>
+              <div className="player-right">
                 {p.bet_this_hand > 0 && <span className="status-tag bet-tag">Pot: {p.bet_this_hand}</span>}
+                <span className="player-chips"><span className="chip-icon" />{p.chips}</span>
                 {engine.showdown && p.hole_cards && !p.folded && engine.shown_cards?.includes(p.player_id) && (
                   <CardList cards={p.hole_cards} size="sm" />
                 )}
