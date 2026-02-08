@@ -358,21 +358,22 @@ class GameEngine:
                 p.is_sitting_out = False
                 p.rebuy_count += 1
                 p.rebuy_queued = False
+                # Remove from elimination order — they're back in the game
+                self.elimination_order = [
+                    e for e in self.elimination_order
+                    if e["player_id"] != p.player_id
+                ]
 
-        # Eliminate busted players and record elimination
+        # Record any remaining busted players in elimination order
         eliminated_ids = {e["player_id"] for e in self.elimination_order}
         for p in self.seats:
             if p.chips <= 0 and not p.rebuy_queued:
-                if not self._can_rebuy(p):
-                    # Permanently eliminated
-                    if p.player_id not in eliminated_ids:
-                        self.elimination_order.append({
-                            "player_id": p.player_id,
-                            "name": p.name,
-                            "eliminated_hand": self.hand_number,
-                        })
-                # Sit out anyone with 0 chips who didn't rebuy
-                # (rebuy-eligible players sit out too — they can queue for next hand)
+                if p.player_id not in eliminated_ids:
+                    self.elimination_order.append({
+                        "player_id": p.player_id,
+                        "name": p.name,
+                        "eliminated_hand": self.hand_number,
+                    })
                 p.is_sitting_out = True
 
         live_players = [i for i, p in enumerate(self.seats) if not p.is_sitting_out]
@@ -950,13 +951,12 @@ class GameEngine:
         Records eliminations and triggers game_over if < 2 players can continue.
         Returns True if game is now over.
         """
-        # Record newly eliminated players (busted, can't rebuy, not already recorded)
+        # Record all newly busted players in elimination order immediately.
+        # They can still rebuy (which removes them from the list).
         eliminated_ids = {e["player_id"] for e in self.elimination_order}
         for p in self.seats:
             if (
                 p.chips <= 0
-                and not p.is_sitting_out
-                and not self._can_rebuy(p)
                 and not p.rebuy_queued
                 and p.player_id not in eliminated_ids
             ):
@@ -982,8 +982,9 @@ class GameEngine:
         """Build final standings: winner first, then by elimination order (last out = 2nd place)."""
         standings: list[dict[str, Any]] = []
 
-        # Winner is the last player standing (not sitting out)
-        live = [p for p in self.seats if not p.is_sitting_out]
+        # Winner is the last player standing (not in elimination order)
+        eliminated_ids = {e["player_id"] for e in self.elimination_order}
+        live = [p for p in self.seats if p.player_id not in eliminated_ids]
         for p in live:
             standings.append({
                 "player_id": p.player_id,
@@ -1013,11 +1014,14 @@ class GameEngine:
             return False
         if p.chips > 0:
             return False
-        # Disable rebuys in heads-up: count players still in the game
-        # (not permanently eliminated), not just those active in the current hand.
+        # Disable rebuys when it would result in heads-up or fewer.
+        # Since busted players are now immediately in elimination_order,
+        # count how many players would be in the game if this player rebuys.
         eliminated_ids = {e["player_id"] for e in self.elimination_order}
         in_game_count = sum(1 for s in self.seats if s.player_id not in eliminated_ids)
-        if in_game_count <= 2:
+        # If this player is in elimination_order, rebuying would add them back
+        would_be_in_game = in_game_count + (1 if p.player_id in eliminated_ids else 0)
+        if would_be_in_game <= 2:
             return False
         if self.max_rebuys > 0 and p.rebuy_count >= self.max_rebuys:
             return False
@@ -1072,6 +1076,11 @@ class GameEngine:
         p.chips = self.starting_chips
         p.is_sitting_out = False
         p.rebuy_count += 1
+        # Remove from elimination order — they're back in the game
+        self.elimination_order = [
+            e for e in self.elimination_order
+            if e["player_id"] != p.player_id
+        ]
         return self._build_state()
 
     def cancel_rebuy(self, player_id: str) -> dict[str, Any]:

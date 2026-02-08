@@ -665,6 +665,100 @@ class TestRebuy:
         e.seats[0].chips = 0
         assert e._can_rebuy(e.seats[0]) is True
 
+    def test_bust_adds_to_elimination_order(self):
+        """Busting adds player to elimination_order immediately (even if rebuy-eligible)."""
+        e = _make_engine(3, starting_chips=100, allow_rebuys=True)
+        _deal_and_get(e)
+        self._end_hand(e)
+        # Simulate p0 lost all chips during the hand
+        e.seats[0].chips = 0
+        e._check_game_over()  # as would fire at end of hand
+        assert any(entry["player_id"] == "p0" for entry in e.elimination_order)
+        assert e.seats[0].is_sitting_out is True
+        # p0 can still rebuy (would bring count back to 3)
+        assert e._can_rebuy(e.seats[0]) is True
+
+    def test_rebuy_removes_from_elimination_order(self):
+        """Rebuying removes the player from elimination_order."""
+        e = _make_engine(3, starting_chips=100, allow_rebuys=True)
+        _deal_and_get(e)
+        self._end_hand(e)
+        e.seats[0].chips = 0
+        e._check_game_over()
+        assert any(entry["player_id"] == "p0" for entry in e.elimination_order)
+        # Rebuy between hands — should remove from elimination_order
+        e.rebuy("p0")
+        assert not any(entry["player_id"] == "p0" for entry in e.elimination_order)
+        assert e.seats[0].chips == 100
+        assert e.seats[0].is_sitting_out is False
+
+    def test_queued_rebuy_removes_from_elimination_order(self):
+        """Queued rebuy removes from elimination_order when processed at start_new_hand."""
+        e = _make_engine(3, starting_chips=100, allow_rebuys=True)
+        _deal_and_get(e)
+        self._end_hand(e)
+        # Bust p0, get them into elimination_order
+        e.seats[0].chips = 0
+        e._check_game_over()
+        assert any(entry["player_id"] == "p0" for entry in e.elimination_order)
+        # Start hand 2 (p0 sitting out, in elimination_order)
+        e.start_new_hand()
+        # p0 queues a rebuy during the active hand
+        e.rebuy("p0")  # queued since hand is active
+        assert e.seats[0].rebuy_queued is True
+        self._end_hand(e)
+        # start_new_hand processes the rebuy and removes from elimination_order
+        e.start_new_hand()
+        assert not any(entry["player_id"] == "p0" for entry in e.elimination_order)
+        assert e.seats[0].chips > 0
+        assert e.seats[0].is_sitting_out is False
+
+    def test_second_bust_before_rebuy_ends_game_with_full_standings(self):
+        """P3 busts, then P2 busts before P3 rebuys — game over with complete standings."""
+        e = _make_engine(3, starting_chips=100, allow_rebuys=True)
+        _deal_and_get(e)
+        self._end_hand(e)  # hand 1 ends
+        # Simulate p2 lost all chips in hand 1
+        e.seats[2].chips = 0
+        # start_new_hand adds p2 to elimination_order, sits them out
+        e.start_new_hand()  # hand 2 (p0 vs p1)
+        assert any(entry["player_id"] == "p2" for entry in e.elimination_order)
+        self._end_hand(e)  # hand 2 ends
+        # Simulate p1 lost all chips in hand 2
+        e.seats[1].chips = 0
+        # start_new_hand adds p1 to elimination_order → game over
+        state = e.start_new_hand()
+        assert state["game_over"] is True
+        assert len(e.final_standings) == 3
+        # p0 is winner (1st), p1 last eliminated (2nd), p2 first eliminated (3rd)
+        assert e.final_standings[0]["player_id"] == "p0"
+        assert e.final_standings[0]["place"] == 1
+        assert e.final_standings[1]["player_id"] == "p1"
+        assert e.final_standings[1]["place"] == 2
+        assert e.final_standings[2]["player_id"] == "p2"
+        assert e.final_standings[2]["place"] == 3
+
+    def test_rebuy_then_bust_creates_correct_order(self):
+        """Player busts, rebuys, then busts again — single entry in elimination_order."""
+        e = _make_engine(3, starting_chips=100, allow_rebuys=True)
+        _deal_and_get(e)
+        self._end_hand(e)
+        # Bust p0, add to elimination_order
+        e.seats[0].chips = 0
+        e._check_game_over()
+        assert any(entry["player_id"] == "p0" for entry in e.elimination_order)
+        # Rebuy — removed from elimination_order
+        e.rebuy("p0")
+        assert not any(entry["player_id"] == "p0" for entry in e.elimination_order)
+        # Play another hand, bust again
+        e.start_new_hand()
+        self._end_hand(e)
+        e.seats[0].chips = 0
+        e._check_game_over()
+        # Should be back in elimination_order with exactly one entry
+        p0_entries = [entry for entry in e.elimination_order if entry["player_id"] == "p0"]
+        assert len(p0_entries) == 1
+
 
 # ── Show cards ───────────────────────────────────────────────────────
 
