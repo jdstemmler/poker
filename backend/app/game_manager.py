@@ -64,7 +64,7 @@ async def create_game(req: CreateGameRequest) -> tuple[str, str, GameState]:
         "id": player_id,
         "name": req.creator_name,
         "pin_hash": _hash_pin(req.creator_pin),
-        "ready": False,
+        "ready": True,
         "connected": False,
         "is_creator": True,
     }
@@ -107,7 +107,7 @@ async def join_game(code: str, req: JoinGameRequest) -> tuple[str, GameState]:
         "id": player_id,
         "name": req.player_name,
         "pin_hash": _hash_pin(req.player_pin),
-        "ready": False,
+        "ready": True,
         "connected": False,
         "is_creator": False,
     }
@@ -158,10 +158,6 @@ async def start_game(code: str, player_id: str, pin: str) -> GameState:
     players = await redis_client.load_all_players(code)
     if len(players) < 2:
         raise ValueError("Need at least 2 players to start")
-
-    not_ready = [p["name"] for p in players if not p["ready"]]
-    if not_ready:
-        raise ValueError(f"Players not ready: {', '.join(not_ready)}")
 
     game_data["status"] = GameStatus.ACTIVE.value
     await redis_client.store_game(code, game_data)

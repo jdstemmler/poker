@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { buildWsUrl, getGame, toggleReady, startGame } from "../api";
+import { buildWsUrl, getGame, startGame } from "../api";
 import { useGameSocket } from "../useGameSocket";
 import type { GameState, ConnectionInfo } from "../types";
 
@@ -75,25 +75,7 @@ export default function LobbyPage() {
   }
 
   const isCreator = playerId === game.creator_id;
-  const me = game.players.find((p) => p.id === playerId);
-  const allReady = game.players.length >= 2 && game.players.every((p) => p.ready);
-  const readyCount = game.players.filter((p) => p.ready).length;
-
-  const handleReady = async () => {
-    if (!code || !playerId || !playerPin) return;
-    setActionLoading(true);
-    try {
-      const state = await toggleReady(code, {
-        player_id: playerId,
-        pin: playerPin,
-      });
-      setGame(state);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const canStart = game.players.length >= 2;
 
   const handleStart = async () => {
     if (!code || !playerId || !playerPin) return;
@@ -160,7 +142,7 @@ export default function LobbyPage() {
       <div className="player-list">
         <h2 className="section-heading">
           Players
-          <span className="ready-count">{readyCount}/{game.players.length} ready</span>
+          <span className="ready-count">{game.players.length} joined</span>
         </h2>
         {game.players.map((p) => {
           const isOnline = connInfo?.connected_players.includes(p.id) ?? p.connected;
@@ -177,8 +159,8 @@ export default function LobbyPage() {
                   {p.id === playerId && <span className="you-tag">you</span>}
                 </span>
               </span>
-              <span className={`ready-badge ${p.ready ? "ready" : "not-ready"}`}>
-                {p.ready ? "✓ Ready" : "Waiting"}
+              <span className={`ready-badge ${isOnline ? "ready" : "not-ready"}`}>
+                {isOnline ? "✓ Online" : "Offline"}
               </span>
             </div>
           );
@@ -186,20 +168,12 @@ export default function LobbyPage() {
       </div>
 
       <div className="lobby-actions">
-        <button
-          className={`btn btn-lg ${me?.ready ? "btn-secondary" : "btn-primary"}`}
-          onClick={handleReady}
-          disabled={actionLoading}
-        >
-          {me?.ready ? "Unready" : "Ready Up"}
-        </button>
-
         {isCreator && (
           <button
             className="btn btn-primary btn-lg"
             onClick={handleStart}
-            disabled={actionLoading || !allReady}
-            title={!allReady ? "All players must be ready" : ""}
+            disabled={actionLoading || !canStart}
+            title={!canStart ? "Need at least 2 players" : ""}
           >
             Start Game
           </button>
