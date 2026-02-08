@@ -1063,6 +1063,8 @@ input::placeholder {
   font-weight: 700;
   border-radius: var(--radius-sm);
   min-height: 48px; /* touch target */
+  -webkit-transform: translateZ(0); /* force GPU layer — fixes iOS repaint bug in sticky containers */
+  transform: translateZ(0);
 }
 
 .btn-fold {
