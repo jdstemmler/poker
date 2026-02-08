@@ -120,6 +120,7 @@ export interface EngineState {
   blind_level_duration: number;
   blind_schedule: number[][];
   next_blind_change_at: number | null;
+  allow_rebuys: boolean;
   max_rebuys: number;
   rebuy_cutoff_minutes: number;
   paused: boolean;

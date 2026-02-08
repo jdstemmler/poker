@@ -175,6 +175,43 @@ export default function TablePage() {
     return () => clearInterval(elapsedRef.current);
   }, [engine?.game_started_at, engine?.paused, engine?.total_paused_seconds]);
 
+  // Rebuy clock countdown
+  const [rebuyTimeLeft, setRebuyTimeLeft] = useState<number | null>(null);
+  const rebuyRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  useEffect(() => {
+    clearInterval(rebuyRef.current);
+
+    if (
+      !engine?.allow_rebuys ||
+      !engine.rebuy_cutoff_minutes ||
+      !engine.game_started_at
+    ) {
+      setRebuyTimeLeft(null);
+      return;
+    }
+
+    const tick = () => {
+      const totalElapsed = Date.now() / 1000 - engine.game_started_at!;
+      const activeSecs = totalElapsed - (engine.total_paused_seconds ?? 0);
+      const cutoffSecs = engine.rebuy_cutoff_minutes * 60;
+      setRebuyTimeLeft(Math.max(0, cutoffSecs - activeSecs));
+    };
+
+    tick();
+    if (!engine.paused) {
+      rebuyRef.current = setInterval(tick, 1000);
+    }
+
+    return () => clearInterval(rebuyRef.current);
+  }, [
+    engine?.allow_rebuys,
+    engine?.rebuy_cutoff_minutes,
+    engine?.game_started_at,
+    engine?.paused,
+    engine?.total_paused_seconds,
+  ]);
+
   // Next blind change countdown
   const [blindCountdown, setBlindCountdown] = useState("");
   const blindRef = useRef<ReturnType<typeof setInterval>>(undefined);
@@ -348,6 +385,29 @@ export default function TablePage() {
           <span className="table-code">{engine.game_code}</span>
           <span className="table-hand">Hand #{engine.hand_number}{elapsed ? ` · ${elapsed}` : ""}</span>
         </div>
+        {engine.allow_rebuys && (
+          <div className="table-header-center">
+            {engine.rebuy_cutoff_minutes > 0 ? (
+              rebuyTimeLeft !== null && rebuyTimeLeft > 0 ? (
+                <>
+                  <span className="rebuy-status open">Rebuy Open</span>
+                  <span className="rebuy-countdown">
+                    {Math.floor(rebuyTimeLeft / 60)}:{String(Math.floor(rebuyTimeLeft % 60)).padStart(2, "0")}
+                  </span>
+                </>
+              ) : (
+                <span className="rebuy-status closed">Rebuy Closed</span>
+              )
+            ) : (
+              <span className="rebuy-status open">Rebuy Open</span>
+            )}
+          </div>
+        )}
+        {!engine.allow_rebuys && (
+          <div className="table-header-center">
+            <span className="rebuy-status disabled">No Rebuys</span>
+          </div>
+        )}
         <div className="table-header-right">
           <div className="table-blinds-info">
             <span className="blinds-value">{engine.small_blind}/{engine.big_blind}</span>

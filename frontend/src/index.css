@@ -824,6 +824,45 @@ input::placeholder {
   gap: 0.5rem;
 }
 
+/* Rebuy Status Indicator (center of header) */
+.table-header-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.rebuy-status {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.5rem;
+  border-radius: 100px;
+}
+
+.rebuy-status.open {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.rebuy-status.closed {
+  background: var(--red-dim);
+  color: var(--red);
+}
+
+.rebuy-status.disabled {
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+}
+
+.rebuy-countdown {
+  font-family: "SF Mono", SFMono-Regular, Consolas, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 .table-blinds-info {
   display: flex;
   flex-direction: column;

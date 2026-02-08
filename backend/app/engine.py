@@ -1068,6 +1068,7 @@ class GameEngine:
             "blind_level_duration": self.blind_level_duration,
             "blind_schedule": [[sb, bb] for sb, bb in self.blind_schedule] if self.blind_schedule else [],
             "next_blind_change_at": self.get_next_blind_change_at(),
+            "allow_rebuys": self.allow_rebuys,
             "max_rebuys": self.max_rebuys,
             "rebuy_cutoff_minutes": self.rebuy_cutoff_minutes,
             "paused": self.paused,
