@@ -402,7 +402,7 @@ export default function TablePage() {
             <span className="table-hand">Hand #{engine.hand_number}{elapsed ? ` · ${elapsed}` : ""}</span>
           </div>
         </div>
-        {engine.allow_rebuys && (
+        {engine.allow_rebuys && engine.players.some(p => p.can_rebuy || p.rebuy_queued) && (
           <div className="table-header-center">
             {engine.rebuy_cutoff_minutes > 0 ? (
               rebuyTimeLeft !== null && rebuyTimeLeft > 0 ? (
@@ -418,6 +418,11 @@ export default function TablePage() {
             ) : (
               <span className="rebuy-status open">Rebuy Open</span>
             )}
+          </div>
+        )}
+        {engine.allow_rebuys && !engine.players.some(p => p.can_rebuy || p.rebuy_queued) && (
+          <div className="table-header-center">
+            <span className="rebuy-status closed">Rebuy Closed</span>
           </div>
         )}
         {!engine.allow_rebuys && (
