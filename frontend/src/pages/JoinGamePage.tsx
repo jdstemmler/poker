@@ -25,8 +25,8 @@ export default function JoinGamePage() {
       sessionStorage.setItem("playerName", name.trim());
       // Navigate to table if game is active, lobby otherwise
       const dest = res.game.status === "active"
-        ? `/game/${code.toUpperCase()}`
-        : `/game/${code.toUpperCase()}/lobby`;
+        ? `/game/${code.toUpperCase()}/table`
+        : `/game/${code.toUpperCase()}`;
       navigate(dest);
     } catch (err: any) {
       setError(err.message || "Failed to join game");
