@@ -16,6 +16,7 @@ export interface GameSettings {
   big_blind: number;
   max_players: number;
   allow_rebuys: boolean;
+  turn_timeout: number;
 }
 
 export interface GameState {
@@ -35,4 +36,85 @@ export interface CreateGameResponse {
 export interface JoinGameResponse {
   player_id: string;
   game: GameState;
+}
+
+// --- Engine / Game types (Phase 2) ---
+
+export interface CardData {
+  rank: number;
+  suit: string; // "h" | "d" | "c" | "s"
+}
+
+export interface EnginePlayer {
+  player_id: string;
+  name: string;
+  chips: number;
+  bet_this_round: number;
+  bet_this_hand: number;
+  folded: boolean;
+  all_in: boolean;
+  is_sitting_out: boolean;
+  hole_cards?: CardData[];
+}
+
+export interface ValidAction {
+  action: string;
+  amount?: number;
+  min_amount?: number;
+  max_amount?: number;
+}
+
+export interface HandResultWinner {
+  player_id: string;
+  name: string;
+  winnings: number;
+  hand: string;
+}
+
+export interface HandResult {
+  winners: HandResultWinner[];
+  pot: number;
+  community_cards: CardData[];
+  player_hands: Record<
+    string,
+    { cards: CardData[]; hand_name: string | null }
+  >;
+}
+
+export type Street = "preflop" | "flop" | "turn" | "river" | "showdown";
+
+export interface EngineState {
+  game_code: string;
+  hand_number: number;
+  street: Street;
+  pot: number;
+  community_cards: CardData[];
+  dealer_idx: number;
+  dealer_player_id: string;
+  action_on: string | null;
+  current_bet: number;
+  min_raise: number;
+  hand_active: boolean;
+  game_over: boolean;
+  message: string;
+  last_hand_result: HandResult | null;
+  players: EnginePlayer[];
+  showdown: boolean;
+  my_cards: CardData[];
+  valid_actions: ValidAction[];
+  turn_timeout: number;
+  action_deadline: number | null;
+}
+
+/** WebSocket message wrapper. */
+export interface WsMessage {
+  type: "game_state" | "lobby_state" | "connection_info" | "ping";
+  data: EngineState;
+}
+
+/** Connection info broadcast from server. */
+export interface ConnectionInfo {
+  type: "connection_info";
+  connected_players: string[];
+  spectator_count: number;
 }

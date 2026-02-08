@@ -1,6 +1,11 @@
 /** API client for communicating with the backend. */
 
-import type { CreateGameResponse, GameState, JoinGameResponse } from "./types";
+import type {
+  CreateGameResponse,
+  EngineState,
+  GameState,
+  JoinGameResponse,
+} from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
@@ -27,6 +32,7 @@ export function createGame(data: {
   big_blind?: number;
   max_players?: number;
   allow_rebuys?: boolean;
+  turn_timeout?: number;
 }): Promise<CreateGameResponse> {
   return request("/api/games", {
     method: "POST",
@@ -68,7 +74,46 @@ export function startGame(
   });
 }
 
-/** Build WebSocket URL for a game lobby. */
+// --- Engine / Game endpoints (Phase 2) ---
+
+export function getEngineState(
+  code: string,
+  playerId: string
+): Promise<EngineState> {
+  return request(`/api/games/${code}/state/${playerId}`);
+}
+
+export function sendAction(
+  code: string,
+  data: { player_id: string; pin: string; action: string; amount?: number }
+): Promise<{ ok: boolean }> {
+  return request(`/api/games/${code}/action`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function dealNextHand(
+  code: string,
+  data: { player_id: string; pin: string }
+): Promise<{ ok: boolean }> {
+  return request(`/api/games/${code}/deal`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function requestRebuy(
+  code: string,
+  data: { player_id: string; pin: string }
+): Promise<{ ok: boolean }> {
+  return request(`/api/games/${code}/rebuy`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/** Build WebSocket URL for a game. */
 export function buildWsUrl(code: string, playerId: string): string {
   const wsBase =
     import.meta.env.VITE_WS_BASE ??

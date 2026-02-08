@@ -25,6 +25,7 @@ class CreateGameRequest(BaseModel):
     big_blind: int = Field(default=20, ge=2)
     max_players: int = Field(default=9, ge=4, le=9)
     allow_rebuys: bool = Field(default=True)
+    turn_timeout: int = Field(default=0, ge=0, le=300)  # seconds, 0 = no timer
 
 
 class JoinGameRequest(BaseModel):
@@ -61,6 +62,7 @@ class GameSettings(BaseModel):
     big_blind: int
     max_players: int
     allow_rebuys: bool
+    turn_timeout: int = 0  # seconds, 0 = no timer
 
 
 class GameState(BaseModel):
