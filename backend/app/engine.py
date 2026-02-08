@@ -64,6 +64,9 @@ class PlayerState:
     def reset_for_new_round(self) -> None:
         self.bet_this_round = 0
         self.has_acted = False
+        # Keep last_action for folded/all-in players; clear for active ones
+        if not self.folded and not self.all_in:
+            self.last_action = ""
 
     def to_dict(self, reveal_cards: bool = False) -> dict[str, Any]:
         d: dict[str, Any] = {
