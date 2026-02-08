@@ -704,7 +704,7 @@ input::placeholder {
 /* ===== Playing Cards ===== */
 .card-display {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   background: #fff;
@@ -718,25 +718,25 @@ input::placeholder {
 }
 
 .card-sm {
-  width: 1.8rem;
-  height: 2.5rem;
-  font-size: 0.55rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  font-size: 0.5rem;
   gap: 0.05rem;
   border-radius: 3px;
 }
 
 .card-md {
-  width: 2.6rem;
-  height: 3.5rem;
-  font-size: 0.8rem;
-  gap: 0.1rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  font-size: 0.75rem;
+  gap: 0.05rem;
 }
 
 .card-lg {
-  width: 3.2rem;
-  height: 4.4rem;
-  font-size: 1rem;
-  gap: 0.15rem;
+  width: 2.6rem;
+  height: 2.6rem;
+  font-size: 0.9rem;
+  gap: 0.05rem;
 }
 
 .card-rank {
@@ -776,7 +776,7 @@ input::placeholder {
 
 .card-list {
   display: inline-flex;
-  gap: 0.3rem;
+  gap: 0.25rem;
   flex-wrap: wrap;
   justify-content: center;
 }
@@ -1024,7 +1024,7 @@ input::placeholder {
 }
 
 .community-cards {
-  min-height: 4.6rem;
+  min-height: 2.8rem;
   display: flex;
   align-items: center;
   justify-content: center;
