@@ -625,7 +625,7 @@ class TestRebuy:
 
     def test_can_rebuy_field_in_state(self):
         """State broadcast should include can_rebuy per player."""
-        e = _make_engine(2, starting_chips=100, allow_rebuys=True, rebuy_cutoff_minutes=60)
+        e = _make_engine(3, starting_chips=100, allow_rebuys=True, rebuy_cutoff_minutes=60)
         _deal_and_get(e)
         self._end_hand(e)
         e.seats[0].chips = 0
@@ -643,6 +643,26 @@ class TestRebuy:
         state = e._build_state()
         p0_state = [p for p in state["players"] if p["player_id"] == "p0"][0]
         assert p0_state["can_rebuy"] is False
+
+    def test_rebuy_disabled_heads_up(self):
+        """When only 2 players are active, busting should end the game (no rebuy)."""
+        e = _make_engine(2, starting_chips=100, allow_rebuys=True)
+        _deal_and_get(e)
+        self._end_hand(e)
+        e.seats[0].chips = 0
+        # _can_rebuy should return False in heads-up
+        assert e._can_rebuy(e.seats[0]) is False
+        # Starting a new hand should trigger game over
+        state = e.start_new_hand()
+        assert state["game_over"] is True
+
+    def test_rebuy_allowed_with_three_players(self):
+        """With 3+ active players, rebuy should still be allowed for busted player."""
+        e = _make_engine(3, starting_chips=100, allow_rebuys=True)
+        _deal_and_get(e)
+        self._end_hand(e)
+        e.seats[0].chips = 0
+        assert e._can_rebuy(e.seats[0]) is True
 
 
 # ── Show cards ───────────────────────────────────────────────────────
