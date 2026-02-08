@@ -1013,10 +1013,11 @@ class GameEngine:
             return False
         if p.chips > 0:
             return False
-        # Disable rebuys in heads-up: if only 2 players are active,
-        # busting means the other player wins.
-        active_count = sum(1 for s in self.seats if not s.is_sitting_out)
-        if active_count <= 2:
+        # Disable rebuys in heads-up: count players still in the game
+        # (not permanently eliminated), not just those active in the current hand.
+        eliminated_ids = {e["player_id"] for e in self.elimination_order}
+        in_game_count = sum(1 for s in self.seats if s.player_id not in eliminated_ids)
+        if in_game_count <= 2:
             return False
         if self.max_rebuys > 0 and p.rebuy_count >= self.max_rebuys:
             return False

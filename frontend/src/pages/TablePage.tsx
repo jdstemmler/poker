@@ -377,7 +377,7 @@ export default function TablePage() {
   ] : [];
 
   // Separate "me" from "others" for layout
-  const otherPlayers = engine.players.filter((p) => p.player_id !== playerId);
+  const isMe = (p: typeof engine.players[0]) => p.player_id === playerId;
 
   return (
     <div className="table-page">
@@ -499,31 +499,10 @@ export default function TablePage() {
         </div>
       )}
 
-      {/* Players */}
+      {/* Players — consistent seat order for all viewers */}
       <div className="player-list">
-        {/* My row always first */}
-        {me && (
-          <div className={`player-row table-player me ${engine.action_on === playerId ? "action-on" : ""} ${me.folded ? "folded" : ""}`}>
-            <div className="player-left">
-              <span className="player-identity">
-                <span className={`conn-dot ${connInfo?.connected_players.includes(me.player_id) ? "on" : "off"}`} />
-                {me.player_id === engine.dealer_player_id && <span className="dealer-chip">D</span>}
-                <span className="player-name">{me.name} <span className="you-tag">you</span></span>
-              </span>
-              {me.last_action && <span className="status-tag action-tag">{me.last_action}</span>}
-              {me.folded && <span className="status-tag folded-tag">Folded</span>}
-              {me.all_in && <span className="status-tag allin-tag">All-In</span>}
-              {me.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
-              {me.rebuy_queued && <span className="status-tag rebuy-tag">Rebuy Queued</span>}
-              {me.rebuy_count > 0 && <span className="status-tag rebuy-tag">🔄 {me.rebuy_count}</span>}
-            </div>
-            <div className="player-right">
-              {me.bet_this_hand > 0 && <span className="status-tag bet-tag">Pot: {me.bet_this_hand}</span>}
-              <span className="player-chips"><span className="chip-icon" />{me.chips}</span>
-            </div>
-          </div>
-        )}
-        {otherPlayers.map((p) => {
+        {engine.players.map((p) => {
+          const isMePlayer = isMe(p);
           const isDealer = p.player_id === engine.dealer_player_id;
           const isAction = p.player_id === engine.action_on;
           const isOnline = connInfo?.connected_players.includes(p.player_id) ?? false;
@@ -531,20 +510,20 @@ export default function TablePage() {
           return (
             <div
               key={p.player_id}
-              className={`player-row table-player ${isAction ? "action-on" : ""} ${p.folded ? "folded" : ""}`}
+              className={`player-row table-player ${isMePlayer ? "me" : ""} ${isAction ? "action-on" : ""} ${p.folded ? "folded" : ""}`}
             >
               <div className="player-left">
                 <span className="player-identity">
                   <span className={`conn-dot ${isOnline ? "on" : "off"}`} />
                   {isDealer && <span className="dealer-chip">D</span>}
-                  <span className="player-name">{p.name}</span>
+                  <span className="player-name">{p.name}{isMePlayer && <> <span className="you-tag">you</span></>}</span>
                 </span>
                 {p.last_action && <span className="status-tag action-tag">{p.last_action}</span>}
                 {p.folded && <span className="status-tag folded-tag">Folded</span>}
                 {p.all_in && <span className="status-tag allin-tag">All-In</span>}
                 {p.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
                 {p.rebuy_queued && <span className="status-tag rebuy-tag">Rebuy Queued</span>}
-                {p.rebuy_count > 0 && <span className="status-tag rebuy-tag">🔄 {p.rebuy_count}</span>}
+                {p.rebuy_count > 0 && <span className="status-tag rebuy-tag">{"\uD83D\uDD04"} {p.rebuy_count}</span>}
               </div>
               <div className="player-right">
                 {p.bet_this_hand > 0 && <span className="status-tag bet-tag">Pot: {p.bet_this_hand}</span>}
