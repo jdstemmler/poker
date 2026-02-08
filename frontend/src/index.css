@@ -1068,26 +1068,31 @@ input::placeholder {
 }
 
 .btn-fold {
+  background-color: var(--red) !important;
   background: var(--red);
   color: #fff;
 }
 
 .btn-check {
-  background: var(--green);
-  color: var(--bg);
+  background-color: #2ecc71 !important;
+  background: #2ecc71 !important;
+  color: #0f0f1a;
 }
 
 .btn-call {
-  background: var(--blue);
+  background-color: #3498db !important;
+  background: #3498db !important;
   color: #fff;
 }
 
 .btn-raise {
+  background-color: var(--orange) !important;
   background: var(--orange);
   color: var(--bg);
 }
 
 .btn-raise.active {
+  background-color: #e08a00 !important;
   background: #e08a00;
   box-shadow: 0 0 0 2px var(--orange);
 }
@@ -1098,6 +1103,7 @@ input::placeholder {
 }
 
 .btn-prefold {
+  background-color: var(--bg-elevated) !important;
   background: var(--bg-elevated);
   color: var(--red);
   border: 1px solid var(--red-dim);
