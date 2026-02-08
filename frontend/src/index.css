@@ -219,6 +219,13 @@ input::placeholder {
   text-transform: uppercase;
 }
 
+.pin-input {
+  font-family: "SF Mono", SFMono-Regular, Consolas, monospace;
+  font-size: 1.2rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
 .row {
   display: flex;
   gap: 0.75rem;

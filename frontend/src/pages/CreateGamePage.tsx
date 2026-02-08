@@ -53,13 +53,16 @@ export default function CreateGamePage() {
     <div className="page">
       <button className="help-btn" onClick={() => setHelpOpen(true)} aria-label="Help">?</button>
       <h1>Create Game</h1>
-      <form onSubmit={handleSubmit} className="form">
+      <form onSubmit={handleSubmit} className="form" autoComplete="off" data-1p-ignore>
         <fieldset className="form-section">
           <legend>Your Identity</legend>
           <label>
             Name
             <input
               type="text"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={20}
@@ -71,13 +74,17 @@ export default function CreateGamePage() {
           <label>
             4-Digit PIN
             <input
-              type="password"
+              type="text"
               inputMode="numeric"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               pattern="\d{4}"
               maxLength={4}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              placeholder="••••"
+              placeholder="1234"
+              className="pin-input"
               required
             />
           </label>
