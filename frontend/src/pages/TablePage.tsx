@@ -390,7 +390,8 @@ export default function TablePage() {
                 <div className="table-menu-backdrop" onClick={() => setMenuOpen(false)} />
                 <div className="table-menu-dropdown">
                   <Link to="/" className="table-menu-item" onClick={() => setMenuOpen(false)}>🏠 Home</Link>
-                  {code && <Link to={`/game/${code}`} className="table-menu-item" onClick={() => setMenuOpen(false)}>📋 Lobby</Link>}
+                  <Link to="/create" className="table-menu-item" onClick={() => setMenuOpen(false)}>🃏 Create Game</Link>
+                  <Link to="/join" className="table-menu-item" onClick={() => setMenuOpen(false)}>🚪 Join Game</Link>
                 </div>
               </>
             )}
