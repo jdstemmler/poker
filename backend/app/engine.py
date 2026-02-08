@@ -317,9 +317,8 @@ class GameEngine:
         actions: list[dict[str, Any]] = []
         to_call = self.current_bet - p.bet_this_round
 
-        # Fold is always available if there's a bet to call
-        if to_call > 0:
-            actions.append({"action": "fold"})
+        # Fold is always available
+        actions.append({"action": "fold"})
 
         # Check (only if nothing to call)
         if to_call == 0:
