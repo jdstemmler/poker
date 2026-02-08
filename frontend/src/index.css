@@ -1042,6 +1042,11 @@ input::placeholder {
   -webkit-tap-highlight-color: transparent;
   -webkit-appearance: none;
   appearance: none;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: background-color;
 }
 
 .btn-raise-confirm:active:not(:disabled) {
@@ -1133,6 +1138,9 @@ input::placeholder {
   display: flex;
   gap: 0.75rem;
   padding: 0.25rem 0;
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  will-change: contents;
 }
 
 .btn-deal {
@@ -1152,6 +1160,11 @@ input::placeholder {
   -webkit-tap-highlight-color: transparent;
   -webkit-appearance: none;
   appearance: none;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: background-color;
   min-height: 48px;
 }
 
@@ -1182,6 +1195,11 @@ input::placeholder {
   cursor: pointer;
   transition: all 0.15s;
   -webkit-tap-highlight-color: transparent;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: background-color;
   min-height: 48px;
 }
 
@@ -1210,6 +1228,13 @@ input::placeholder {
   cursor: pointer;
   transition: all 0.15s;
   -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: background-color;
   min-height: 48px;
 }
 
@@ -1252,6 +1277,11 @@ input::placeholder {
   cursor: pointer;
   min-height: 48px;
   -webkit-tap-highlight-color: transparent;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: background-color;
 }
 
 .btn-resume {
@@ -1266,6 +1296,11 @@ input::placeholder {
   font-weight: 700;
   cursor: pointer;
   min-height: 48px;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: background-color;
   -webkit-tap-highlight-color: transparent;
 }
 
