@@ -1694,6 +1694,55 @@ input::placeholder {
   font-size: 1.5rem;
 }
 
+.standings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+  text-align: left;
+}
+
+.standing-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  font-size: 0.85rem;
+}
+
+.standing-row.winner {
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+}
+
+.standing-place {
+  font-weight: 700;
+  min-width: 2rem;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.standing-row.winner .standing-place {
+  font-size: 1.2rem;
+}
+
+.standing-name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.standing-row.winner .standing-name {
+  color: gold;
+}
+
+.standing-chips {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

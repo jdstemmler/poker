@@ -693,7 +693,23 @@ export default function TablePage() {
         <div className="game-over-overlay">
           <div className="game-over-card">
             <h2>Game Over</h2>
-            <p>{engine.message}</p>
+            {engine.final_standings && engine.final_standings.length > 0 ? (
+              <div className="standings-list">
+                {engine.final_standings.map((s, i) => (
+                  <div key={s.player_id} className={`standing-row ${i === 0 ? "winner" : ""}`}>
+                    <span className="standing-place">
+                      {i === 0 ? "\u{1F3C6}" : `#${s.place}`}
+                    </span>
+                    <span className="standing-name">{s.name}</span>
+                    <span className="standing-chips">
+                      {i === 0 ? `${s.chips} chips` : `Out hand #${s.eliminated_hand}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>{engine.message}</p>
+            )}
             <Link to="/" className="btn btn-primary">Back to Home</Link>
           </div>
         </div>

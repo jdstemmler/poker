@@ -197,7 +197,8 @@ class TestDealing:
         e.seats[0].is_sitting_out = True
         state = _deal_and_get(e)
         assert state["game_over"] is True
-        assert "Not enough" in state["message"]
+        assert "wins the game!" in state["message"]
+        assert len(state["final_standings"]) > 0
 
 
 # ── Heads-up dealing ─────────────────────────────────────────────────

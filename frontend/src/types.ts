@@ -90,6 +90,14 @@ export interface HandResult {
 
 export type Street = "preflop" | "flop" | "turn" | "river" | "showdown";
 
+export interface FinalStanding {
+  player_id: string;
+  name: string;
+  chips: number;
+  place: number;
+  eliminated_hand?: number;
+}
+
 export interface EngineState {
   game_code: string;
   hand_number: number;
@@ -104,6 +112,7 @@ export interface EngineState {
   hand_active: boolean;
   game_over: boolean;
   message: string;
+  final_standings: FinalStanding[];
   last_hand_result: HandResult | null;
   players: EnginePlayer[];
   showdown: boolean;

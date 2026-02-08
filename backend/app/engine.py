@@ -225,6 +225,11 @@ class GameEngine:
         self.game_over: bool = False
         self.game_over_message: str = ""
 
+        # Player elimination tracking: list of {player_id, name, eliminated_hand}
+        # Recorded in order of elimination (first entry = first player out)
+        self.elimination_order: list[dict[str, Any]] = []
+        self.final_standings: list[dict[str, Any]] = []
+
     @classmethod
     def _build_schedule_from(
         cls, start_sb: int, start_bb: int
@@ -342,6 +347,10 @@ class GameEngine:
 
     def start_new_hand(self) -> dict[str, Any]:
         """Deal a new hand. Returns game state snapshot."""
+        # If game is already over (detected at end of previous hand), return immediately
+        if self.game_over:
+            return self._build_state()
+
         # Process queued rebuys first
         for p in self.seats:
             if p.rebuy_queued:
@@ -350,19 +359,25 @@ class GameEngine:
                 p.rebuy_count += 1
                 p.rebuy_queued = False
 
-        # Eliminate busted players
+        # Eliminate busted players and record elimination
+        eliminated_ids = {e["player_id"] for e in self.elimination_order}
         for p in self.seats:
             if p.chips <= 0 and not self._can_rebuy(p) and not p.rebuy_queued:
+                if p.player_id not in eliminated_ids:
+                    self.elimination_order.append({
+                        "player_id": p.player_id,
+                        "name": p.name,
+                        "eliminated_hand": self.hand_number,
+                    })
                 p.is_sitting_out = True
 
         live_players = [i for i, p in enumerate(self.seats) if not p.is_sitting_out]
         if len(live_players) < 2:
             self.game_over = True
-            self.game_over_message = "Not enough players to continue"
-            return self._build_state(
-                message="Not enough players to continue",
-                game_over=True,
-            )
+            self.final_standings = self._build_final_standings()
+            winner_name = self.final_standings[0]["name"] if self.final_standings else "Unknown"
+            self.game_over_message = f"{winner_name} wins the game!"
+            return self._build_state()
 
         self.hand_number += 1
         self.last_hand_result = None
@@ -868,6 +883,10 @@ class GameEngine:
         self.hand_active = False
         self.action_deadline = None
 
+        # Check for game over immediately after hand ends
+        if self._check_game_over():
+            return self._build_state(showdown=True)
+
         self._set_auto_deal_deadline()
 
         return self._build_state(showdown=True)
@@ -900,6 +919,10 @@ class GameEngine:
         self.hand_active = False
         self.action_deadline = None
 
+        # Check for game over immediately after hand ends
+        if self._check_game_over():
+            return self._build_state(showdown=False)
+
         self._set_auto_deal_deadline()
 
         return self._build_state(showdown=False)
@@ -907,6 +930,69 @@ class GameEngine:
     # ------------------------------------------------------------------
     # Rebuy
     # ------------------------------------------------------------------
+
+    def _check_game_over(self) -> bool:
+        """Check if the game is over after a hand ends.
+
+        Records eliminations and triggers game_over if < 2 players can continue.
+        Returns True if game is now over.
+        """
+        # Record newly eliminated players (busted, can't rebuy, not already recorded)
+        eliminated_ids = {e["player_id"] for e in self.elimination_order}
+        for p in self.seats:
+            if (
+                p.chips <= 0
+                and not p.is_sitting_out
+                and not self._can_rebuy(p)
+                and not p.rebuy_queued
+                and p.player_id not in eliminated_ids
+            ):
+                self.elimination_order.append({
+                    "player_id": p.player_id,
+                    "name": p.name,
+                    "eliminated_hand": self.hand_number,
+                })
+                p.is_sitting_out = True
+
+        # Count players who can still play
+        live_players = [p for p in self.seats if not p.is_sitting_out]
+        if len(live_players) < 2:
+            self.game_over = True
+            self.final_standings = self._build_final_standings()
+            winner_name = self.final_standings[0]["name"] if self.final_standings else "Unknown"
+            self.game_over_message = f"{winner_name} wins the game!"
+            self.auto_deal_deadline = None
+            return True
+        return False
+
+    def _build_final_standings(self) -> list[dict[str, Any]]:
+        """Build final standings: winner first, then by elimination order (last out = 2nd place)."""
+        standings: list[dict[str, Any]] = []
+
+        # Winner is the last player standing (not sitting out)
+        live = [p for p in self.seats if not p.is_sitting_out]
+        for p in live:
+            standings.append({
+                "player_id": p.player_id,
+                "name": p.name,
+                "chips": p.chips,
+                "place": 1,
+            })
+
+        # Eliminated players in reverse order (last eliminated = 2nd place)
+        place = len(standings) + 1
+        for entry in reversed(self.elimination_order):
+            p = self._find_player(entry["player_id"])
+            standings.append({
+                "player_id": entry["player_id"],
+                "name": entry["name"],
+                "chips": p.chips if p else 0,
+                "place": place,
+                "eliminated_hand": entry["eliminated_hand"],
+            })
+            place += 1
+
+        return standings
 
     def _can_rebuy(self, p: PlayerState) -> bool:
         """Check if a busted player is eligible to rebuy (ignoring hand_active)."""
@@ -1067,6 +1153,7 @@ class GameEngine:
             "hand_active": self.hand_active,
             "game_over": game_over,
             "message": message,
+            "final_standings": self.final_standings if game_over else [],
             "last_hand_result": self.last_hand_result,
             "players": [
                 {**p.to_dict(reveal_cards=showdown or p.player_id in self.shown_cards),
@@ -1198,6 +1285,8 @@ class GameEngine:
             "total_paused_seconds": self.total_paused_seconds,
             "game_over": self.game_over,
             "game_over_message": self.game_over_message,
+            "elimination_order": self.elimination_order,
+            "final_standings": self.final_standings,
         }
 
     @classmethod
@@ -1240,6 +1329,8 @@ class GameEngine:
         engine.total_paused_seconds = data.get("total_paused_seconds", 0)
         engine.game_over = data.get("game_over", False)
         engine.game_over_message = data.get("game_over_message", "")
+        engine.elimination_order = data.get("elimination_order", [])
+        engine.final_standings = data.get("final_standings", [])
 
         engine.seats = []
         for s in data["seats"]:
