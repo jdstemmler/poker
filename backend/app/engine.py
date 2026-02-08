@@ -362,13 +362,17 @@ class GameEngine:
         # Eliminate busted players and record elimination
         eliminated_ids = {e["player_id"] for e in self.elimination_order}
         for p in self.seats:
-            if p.chips <= 0 and not self._can_rebuy(p) and not p.rebuy_queued:
-                if p.player_id not in eliminated_ids:
-                    self.elimination_order.append({
-                        "player_id": p.player_id,
-                        "name": p.name,
-                        "eliminated_hand": self.hand_number,
-                    })
+            if p.chips <= 0 and not p.rebuy_queued:
+                if not self._can_rebuy(p):
+                    # Permanently eliminated
+                    if p.player_id not in eliminated_ids:
+                        self.elimination_order.append({
+                            "player_id": p.player_id,
+                            "name": p.name,
+                            "eliminated_hand": self.hand_number,
+                        })
+                # Sit out anyone with 0 chips who didn't rebuy
+                # (rebuy-eligible players sit out too — they can queue for next hand)
                 p.is_sitting_out = True
 
         live_players = [i for i, p in enumerate(self.seats) if not p.is_sitting_out]
@@ -403,6 +407,15 @@ class GameEngine:
         for p in self.seats:
             if not p.is_sitting_out:
                 p.reset_for_new_hand()
+            else:
+                # Clear stale status from previous hand for sitting-out players
+                p.folded = False
+                p.all_in = False
+                p.has_acted = False
+                p.last_action = ""
+                p.bet_this_round = 0
+                p.bet_this_hand = 0
+                p.hole_cards = []
 
         self.deck = Deck()
         self.community_cards = []
