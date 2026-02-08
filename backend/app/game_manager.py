@@ -294,3 +294,14 @@ async def request_rebuy(code: str, player_id: str, pin: str) -> dict[str, Any]:
     await _save_engine(code, engine)
 
     return result
+
+
+async def show_cards(code: str, player_id: str, pin: str) -> dict[str, Any]:
+    """Allow a player to voluntarily show their cards after a hand."""
+    await verify_player(code, player_id, pin)
+
+    engine = await _load_engine(code)
+    result = engine.show_cards(player_id)
+    await _save_engine(code, engine)
+
+    return result

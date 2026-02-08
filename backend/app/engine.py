@@ -44,6 +44,7 @@ class PlayerState:
         self.all_in: bool = False
         self.has_acted: bool = False
         self.is_sitting_out: bool = False
+        self.last_action: str = ""
 
     @property
     def is_active(self) -> bool:
@@ -57,6 +58,7 @@ class PlayerState:
         self.folded = False
         self.all_in = False
         self.has_acted = False
+        self.last_action = ""
 
     def reset_for_new_round(self) -> None:
         self.bet_this_round = 0
@@ -72,6 +74,7 @@ class PlayerState:
             "folded": self.folded,
             "all_in": self.all_in,
             "is_sitting_out": self.is_sitting_out,
+            "last_action": self.last_action,
         }
         if reveal_cards and self.hole_cards:
             d["hole_cards"] = [c.to_dict() for c in self.hole_cards]
@@ -163,6 +166,9 @@ class GameEngine:
         # Results of the last completed hand (for UI display)
         self.last_hand_result: Optional[dict[str, Any]] = None
 
+        # Players who chose to reveal their cards post-hand
+        self.shown_cards: set[str] = set()
+
     # ------------------------------------------------------------------
     # Accessors
     # ------------------------------------------------------------------
@@ -233,6 +239,9 @@ class GameEngine:
         self.hand_number += 1
         self.last_hand_result = None
 
+        # Reset shown cards for new hand
+        self.shown_cards = set()
+
         # Rotate dealer
         if self.hand_number > 1:
             self.dealer_idx = self._next_seat(self.dealer_idx)
@@ -275,8 +284,8 @@ class GameEngine:
             sb_idx = self._next_seat(self.dealer_idx)
             bb_idx = self._next_seat(sb_idx)
 
-        self._force_bet(sb_idx, self.small_blind)
-        self._force_bet(bb_idx, self.big_blind)
+        self._force_bet(sb_idx, self.small_blind, "SB")
+        self._force_bet(bb_idx, self.big_blind, "BB")
 
         self.current_bet = self.big_blind
         self.min_raise = self.big_blind  # min raise size = one big blind
@@ -288,7 +297,7 @@ class GameEngine:
         # In preflop, the big blind acts last (gets option to raise)
         self.last_raiser_idx = bb_idx
 
-    def _force_bet(self, idx: int, amount: int) -> int:
+    def _force_bet(self, idx: int, amount: int, label: str = "") -> int:
         """Force a player to bet (blinds/antes). Returns actual amount posted."""
         p = self.seats[idx]
         actual = min(amount, p.chips)
@@ -296,6 +305,8 @@ class GameEngine:
         p.bet_this_round += actual
         p.bet_this_hand += actual
         self.pot += actual
+        if label:
+            p.last_action = f"{label} {actual}"
         if p.chips == 0:
             p.all_in = True
         return actual
@@ -404,6 +415,7 @@ class GameEngine:
         p = self.seats[idx]
         p.folded = True
         p.has_acted = True
+        p.last_action = "Fold"
         if self.current_history:
             self.current_history.record_action(
                 p.player_id, PlayerAction.FOLD, 0, self.street
@@ -412,6 +424,7 @@ class GameEngine:
     def _do_check(self, idx: int) -> None:
         p = self.seats[idx]
         p.has_acted = True
+        p.last_action = "Check"
         if self.current_history:
             self.current_history.record_action(
                 p.player_id, PlayerAction.CHECK, 0, self.street
@@ -426,8 +439,10 @@ class GameEngine:
         p.bet_this_hand += actual
         self.pot += actual
         p.has_acted = True
+        p.last_action = f"Call {actual}"
         if p.chips == 0:
             p.all_in = True
+            p.last_action = f"All-In {actual}"
         if self.current_history:
             self.current_history.record_action(
                 p.player_id, PlayerAction.CALL, actual, self.street
@@ -459,9 +474,11 @@ class GameEngine:
         self.current_bet = p.bet_this_round
         self.last_raiser_idx = idx
         p.has_acted = True
+        p.last_action = f"Raise {actual}"
 
         if p.chips == 0:
             p.all_in = True
+            p.last_action = f"All-In {p.bet_this_hand}"
 
         # Reset has_acted for other active players (they need to respond)
         for i, other in enumerate(self.seats):
@@ -497,6 +514,7 @@ class GameEngine:
         self.pot += amount
         p.all_in = True
         p.has_acted = True
+        p.last_action = f"All-In {p.bet_this_hand}"
 
         if self.current_history:
             self.current_history.record_action(
@@ -699,6 +717,20 @@ class GameEngine:
         p.is_sitting_out = False
         return self._build_state()
 
+    def show_cards(self, player_id: str) -> dict[str, Any]:
+        """Allow a player to voluntarily reveal their cards after a hand."""
+        if self.hand_active:
+            raise ValueError("Hand is still active")
+
+        p = self._find_player(player_id)
+        if p is None:
+            raise ValueError("Player not found")
+        if not p.hole_cards:
+            raise ValueError("No cards to show")
+
+        self.shown_cards.add(player_id)
+        return self._build_state(showdown=True)
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
@@ -742,7 +774,8 @@ class GameEngine:
             "message": message,
             "last_hand_result": self.last_hand_result,
             "players": [
-                p.to_dict(reveal_cards=showdown) for p in self.seats
+                p.to_dict(reveal_cards=showdown or p.player_id in self.shown_cards)
+                for p in self.seats
             ],
             # Showdown reveals all non-folded cards
             "showdown": showdown,
@@ -752,9 +785,8 @@ class GameEngine:
 
     def get_player_view(self, player_id: str) -> dict[str, Any]:
         """Build a state view for a specific player (shows their own hole cards)."""
-        state = self._build_state(
-            showdown=(self.street == Street.SHOWDOWN),
-        )
+        is_showdown = self.street == Street.SHOWDOWN
+        state = self._build_state(showdown=is_showdown)
 
         # Add this player's hole cards
         player = self._find_player(player_id)
@@ -763,10 +795,35 @@ class GameEngine:
         else:
             state["my_cards"] = []
 
-        # Hide other players' cards (unless showdown)
-        if self.street != Street.SHOWDOWN:
-            for p_data in state["players"]:
+        # Control card visibility per player
+        for p_data in state["players"]:
+            pid = p_data["player_id"]
+            if pid == player_id:
+                # Always strip own cards from the player list (shown via my_cards)
                 p_data.pop("hole_cards", None)
+            elif pid in self.shown_cards:
+                # Player chose to show (or auto-revealed as winner) — keep cards
+                pass
+            else:
+                # Hide cards
+                p_data.pop("hole_cards", None)
+
+        # Include which players have shown their cards
+        state["shown_cards"] = list(self.shown_cards)
+
+        # Filter last_hand_result.player_hands so only shown players' cards are visible
+        if state.get("last_hand_result") and "player_hands" in state["last_hand_result"]:
+            filtered_hands = {}
+            for pid, hand_data in state["last_hand_result"]["player_hands"].items():
+                if pid == player_id or pid in self.shown_cards:
+                    filtered_hands[pid] = hand_data
+                else:
+                    # Include hand name but strip cards
+                    filtered_hands[pid] = {
+                        "cards": [],
+                        "hand_name": hand_data.get("hand_name"),
+                    }
+            state["last_hand_result"] = {**state["last_hand_result"], "player_hands": filtered_hands}
 
         # Add valid actions for this player
         state["valid_actions"] = self.get_valid_actions(player_id)
@@ -811,10 +868,12 @@ class GameEngine:
                     "all_in": p.all_in,
                     "has_acted": p.has_acted,
                     "is_sitting_out": p.is_sitting_out,
+                    "last_action": p.last_action,
                 }
                 for p in self.seats
             ],
             "hand_histories": [h.to_dict() for h in self.hand_histories],
+            "shown_cards": list(self.shown_cards),
         }
 
     @classmethod
@@ -842,6 +901,7 @@ class GameEngine:
         deck_data = data.get("deck")
         engine.deck = Deck.from_dict(deck_data) if deck_data else None
         engine.current_history = None
+        engine.shown_cards = set(data.get("shown_cards", []))
 
         engine.seats = []
         for s in data["seats"]:
@@ -853,6 +913,7 @@ class GameEngine:
             ps.all_in = s["all_in"]
             ps.has_acted = s["has_acted"]
             ps.is_sitting_out = s["is_sitting_out"]
+            ps.last_action = s.get("last_action", "")
             engine.seats.append(ps)
 
         engine.hand_histories = []

@@ -113,6 +113,16 @@ export function requestRebuy(
   });
 }
 
+export function showCards(
+  code: string,
+  data: { player_id: string; pin: string }
+): Promise<{ ok: boolean }> {
+  return request(`/api/games/${code}/show_cards`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 /** Build WebSocket URL for a game. */
 export function buildWsUrl(code: string, playerId: string): string {
   const wsBase =

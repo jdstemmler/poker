@@ -824,6 +824,11 @@ input::placeholder {
   color: var(--blue);
 }
 
+.action-tag {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
 /* Hand Result */
 .hand-result {
   margin: 0 1rem;
@@ -1040,6 +1045,23 @@ input::placeholder {
   color: #fff;
 }
 
+.btn-prefold {
+  background: var(--bg-elevated);
+  color: var(--red);
+  border: 1px solid var(--red-dim);
+}
+
+.btn-prefold-active {
+  background: var(--red);
+  color: #fff;
+  animation: pulse-glow-red 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-red {
+  0%, 100% { box-shadow: 0 0 6px var(--red-dim); }
+  50% { box-shadow: 0 0 14px var(--red-dim); }
+}
+
 /* Between Hands */
 .between-hands {
   display: flex;
@@ -1098,6 +1120,34 @@ input::placeholder {
 }
 
 .btn-rebuy:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-show-cards {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  background: var(--gold-dim);
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 48px;
+}
+
+.btn-show-cards:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-show-cards:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }

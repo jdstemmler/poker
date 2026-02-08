@@ -54,6 +54,7 @@ export interface EnginePlayer {
   folded: boolean;
   all_in: boolean;
   is_sitting_out: boolean;
+  last_action: string;
   hole_cards?: CardData[];
 }
 
@@ -100,6 +101,7 @@ export interface EngineState {
   last_hand_result: HandResult | null;
   players: EnginePlayer[];
   showdown: boolean;
+  shown_cards: string[];
   my_cards: CardData[];
   valid_actions: ValidAction[];
   turn_timeout: number;

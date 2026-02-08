@@ -8,6 +8,7 @@ import {
   sendAction,
   dealNextHand,
   requestRebuy,
+  showCards,
   getGame,
 } from "../api";
 import { useGameSocket } from "../useGameSocket";
@@ -23,6 +24,7 @@ export default function TablePage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [raiseAmount, setRaiseAmount] = useState(0);
   const [showRaisePanel, setShowRaisePanel] = useState(false);
+  const [preFold, setPreFold] = useState(false);
 
   const playerId = sessionStorage.getItem("playerId");
   const playerPin = sessionStorage.getItem("playerPin");
@@ -72,6 +74,22 @@ export default function TablePage() {
       setShowRaisePanel(false);
     }
   }, [engine?.valid_actions, engine?.action_on, playerId]);
+
+  // Pre-fold: auto-fold when it becomes our turn
+  useEffect(() => {
+    if (!engine || !preFold) return;
+    if (engine.action_on === playerId && engine.hand_active) {
+      setPreFold(false);
+      doAction("fold");
+    }
+  }, [engine?.action_on, engine?.hand_active, preFold, playerId]);
+
+  // Clear pre-fold when hand ends  
+  useEffect(() => {
+    if (engine && !engine.hand_active) {
+      setPreFold(false);
+    }
+  }, [engine?.hand_active]);
 
   // Countdown timer
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -163,6 +181,19 @@ export default function TablePage() {
     setError("");
     try {
       await requestRebuy(code, { player_id: playerId, pin: playerPin });
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const doShowCards = async () => {
+    if (!code || !playerId || !playerPin) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      await showCards(code, { player_id: playerId, pin: playerPin });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -272,13 +303,11 @@ export default function TablePage() {
               <span className="player-chips"><span className="chip-icon" />{me.chips}</span>
             </div>
             <div className="player-bottom">
+              {me.last_action && <span className="status-tag action-tag">{me.last_action}</span>}
               {me.folded && <span className="status-tag folded-tag">Folded</span>}
               {me.all_in && <span className="status-tag allin-tag">All-In</span>}
               {me.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
-              {me.bet_this_round > 0 && <span className="status-tag bet-tag">Bet: {me.bet_this_round}</span>}
-              {engine.showdown && me.hole_cards && !me.folded && (
-                <CardList cards={me.hole_cards} size="sm" />
-              )}
+              {me.bet_this_hand > 0 && <span className="status-tag bet-tag">Pot: {me.bet_this_hand}</span>}
             </div>
           </div>
         )}
@@ -301,11 +330,12 @@ export default function TablePage() {
                 <span className="player-chips"><span className="chip-icon" />{p.chips}</span>
               </div>
               <div className="player-bottom">
+                {p.last_action && <span className="status-tag action-tag">{p.last_action}</span>}
                 {p.folded && <span className="status-tag folded-tag">Folded</span>}
                 {p.all_in && <span className="status-tag allin-tag">All-In</span>}
                 {p.is_sitting_out && <span className="status-tag sit-tag">Sitting Out</span>}
-                {p.bet_this_round > 0 && <span className="status-tag bet-tag">Bet: {p.bet_this_round}</span>}
-                {engine.showdown && p.hole_cards && !p.folded && (
+                {p.bet_this_hand > 0 && <span className="status-tag bet-tag">Pot: {p.bet_this_hand}</span>}
+                {engine.showdown && p.hole_cards && !p.folded && engine.shown_cards?.includes(p.player_id) && (
                   <CardList cards={p.hole_cards} size="sm" />
                 )}
               </div>
@@ -354,37 +384,52 @@ export default function TablePage() {
           </div>
         )}
 
-        {/* Main action buttons */}
-        {isMyTurn && engine.hand_active && (
+        {/* Main action buttons — always visible during active hand */}
+        {engine.hand_active && me && !me.folded && !me.is_sitting_out && (
           <div className="action-bar">
-            {canFold && (
-              <button className="btn btn-fold" onClick={() => doAction("fold")} disabled={actionLoading}>
-                Fold
-              </button>
-            )}
-            {canCheck && (
-              <button className="btn btn-check" onClick={() => doAction("check")} disabled={actionLoading}>
-                Check
-              </button>
-            )}
-            {callAction && (
-              <button className="btn btn-call" onClick={() => doAction("call")} disabled={actionLoading}>
-                Call {callAction.amount}
-              </button>
-            )}
-            {raiseAction && (
-              <button
-                className={`btn btn-raise ${showRaisePanel ? "active" : ""}`}
-                onClick={() => setShowRaisePanel(!showRaisePanel)}
-                disabled={actionLoading}
-              >
-                Raise
-              </button>
-            )}
-            {allInAction && !raiseAction && (
-              <button className="btn btn-allin" onClick={() => doAction("all_in")} disabled={actionLoading}>
-                All-In {allInAction.amount}
-              </button>
+            {isMyTurn ? (
+              <>
+                {canFold && (
+                  <button className="btn btn-fold" onClick={() => doAction("fold")} disabled={actionLoading}>
+                    Fold
+                  </button>
+                )}
+                {canCheck && (
+                  <button className="btn btn-check" onClick={() => doAction("check")} disabled={actionLoading}>
+                    Check
+                  </button>
+                )}
+                {callAction && (
+                  <button className="btn btn-call" onClick={() => doAction("call")} disabled={actionLoading}>
+                    Call {callAction.amount}
+                  </button>
+                )}
+                {raiseAction && (
+                  <button
+                    className={`btn btn-raise ${showRaisePanel ? "active" : ""}`}
+                    onClick={() => setShowRaisePanel(!showRaisePanel)}
+                    disabled={actionLoading}
+                  >
+                    Raise
+                  </button>
+                )}
+                {allInAction && !raiseAction && (
+                  <button className="btn btn-allin" onClick={() => doAction("all_in")} disabled={actionLoading}>
+                    All-In {allInAction.amount}
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  className={`btn ${preFold ? "btn-prefold-active" : "btn-prefold"}`}
+                  onClick={() => setPreFold(!preFold)}
+                >
+                  {preFold ? "Pre-Fold ✓" : "Pre-Fold"}
+                </button>
+                <button className="btn btn-check" disabled>Check</button>
+                <button className="btn btn-raise" disabled>Raise</button>
+              </>
             )}
           </div>
         )}
@@ -400,6 +445,11 @@ export default function TablePage() {
             {me && me.chips === 0 && (
               <button className="btn btn-rebuy" onClick={doRebuy} disabled={actionLoading}>
                 Rebuy
+              </button>
+            )}
+            {me && engine.my_cards.length > 0 && !engine.shown_cards?.includes(playerId!) && (
+              <button className="btn btn-show-cards" onClick={doShowCards} disabled={actionLoading}>
+                Show Cards
               </button>
             )}
           </div>
