@@ -738,6 +738,54 @@ class GameEngine:
     # Showdown & Pot Award
     # ------------------------------------------------------------------
 
+    def _calculate_pots(self) -> list[tuple[int, list[int]]]:
+        """Build main pot and side pots based on bet_this_hand contributions.
+
+        Returns a list of (pot_amount, [eligible_player_indices]).
+        Each pot is the portion that the eligible players contributed equally to.
+        """
+        in_hand = self._players_in_hand()
+
+        # Gather unique contribution levels from non-folded players
+        contribution_levels: list[int] = sorted(
+            set(self.seats[i].bet_this_hand for i in in_hand)
+        )
+
+        # Also include folded players' contributions in the pool
+        # (they contributed but can't win)
+        all_contributions = {
+            i: self.seats[i].bet_this_hand
+            for i in range(len(self.seats))
+            if not self.seats[i].is_sitting_out and self.seats[i].bet_this_hand > 0
+        }
+
+        pots: list[tuple[int, list[int]]] = []
+        prev_level = 0
+
+        for level in contribution_levels:
+            slice_amount = level - prev_level
+            if slice_amount <= 0:
+                continue
+
+            # Everyone who contributed at least this level pays into this pot
+            pot_total = 0
+            for idx, contrib in all_contributions.items():
+                take = min(slice_amount, contrib - prev_level)
+                if take > 0:
+                    pot_total += take
+
+            # Only non-folded players who contributed at least this level are eligible
+            eligible = [
+                i for i in in_hand if self.seats[i].bet_this_hand >= level
+            ]
+
+            if pot_total > 0 and eligible:
+                pots.append((pot_total, eligible))
+
+            prev_level = level
+
+        return pots
+
     def _showdown(self) -> dict[str, Any]:
         """Evaluate hands, determine winners, award pot."""
         self.street = Street.SHOWDOWN
@@ -752,26 +800,44 @@ class GameEngine:
                 hand_rank = evaluate(all_cards)
                 player_hands[p.player_id] = hand_rank
 
-        winner_ids = determine_winners(player_hands)
-        share = self.pot // len(winner_ids) if winner_ids else 0
-        remainder = self.pot - (share * len(winner_ids)) if winner_ids else 0
+        # Calculate side pots and award each one
+        pots = self._calculate_pots()
+        winnings_by_pid: dict[str, int] = {}
+        best_hand_by_pid: dict[str, str] = {}
 
-        result_winners = []
-        for i, pid in enumerate(winner_ids):
-            winnings = share + (1 if i < remainder else 0)
-            player = self._find_player(pid)
-            if player:
-                player.chips += winnings
-                result_winners.append(
-                    {
-                        "player_id": pid,
-                        "name": player.name,
-                        "winnings": winnings,
-                        "hand": player_hands[pid].name
-                        if pid in player_hands
-                        else "Unknown",
-                    }
-                )
+        for pot_amount, eligible_indices in pots:
+            # Build hands map for only eligible players
+            eligible_hands = {
+                self.seats[i].player_id: player_hands[self.seats[i].player_id]
+                for i in eligible_indices
+                if self.seats[i].player_id in player_hands
+            }
+
+            pot_winner_ids = determine_winners(eligible_hands)
+            if not pot_winner_ids:
+                continue
+
+            share = pot_amount // len(pot_winner_ids)
+            remainder = pot_amount - (share * len(pot_winner_ids))
+
+            for j, pid in enumerate(pot_winner_ids):
+                w = share + (1 if j < remainder else 0)
+                player = self._find_player(pid)
+                if player:
+                    player.chips += w
+                    winnings_by_pid[pid] = winnings_by_pid.get(pid, 0) + w
+                    if pid in player_hands:
+                        best_hand_by_pid[pid] = player_hands[pid].name
+
+        result_winners = [
+            {
+                "player_id": pid,
+                "name": self._find_player(pid).name,
+                "winnings": total,
+                "hand": best_hand_by_pid.get(pid, "Unknown"),
+            }
+            for pid, total in winnings_by_pid.items()
+        ]
 
         self.last_hand_result = {
             "winners": result_winners,

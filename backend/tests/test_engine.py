@@ -595,3 +595,158 @@ class TestShowCards:
         self._end_hand(e)
         with pytest.raises(ValueError, match="not found"):
             e.show_cards("nonexistent")
+
+
+# ── Side Pots ────────────────────────────────────────────────────────
+
+class TestSidePots:
+    """Test the _calculate_pots method and side pot award logic."""
+
+    def test_equal_contributions_single_pot(self):
+        """Two players bet the same amount — one main pot."""
+        e = _make_engine(2, starting_chips=1000)
+        e.start_new_hand()
+        # Manually set up: both players bet 500
+        for s in e.seats:
+            s.bet_this_hand = 500
+        e.pot = 1000
+        pots = e._calculate_pots()
+        assert len(pots) == 1
+        assert pots[0][0] == 1000
+        assert len(pots[0][1]) == 2
+
+    def test_unequal_all_in_creates_two_pots(self):
+        """Short-stack all-in creates main pot + side pot."""
+        e = _make_engine(2, starting_chips=1000)
+        e.start_new_hand()
+        # p0 bet 500, p1 bet 1000
+        e.seats[0].bet_this_hand = 500
+        e.seats[0].all_in = True
+        e.seats[1].bet_this_hand = 1000
+        e.seats[1].all_in = True
+        e.pot = 1500
+        pots = e._calculate_pots()
+        assert len(pots) == 2
+        # Main pot: 500 * 2 = 1000 (both eligible)
+        assert pots[0][0] == 1000
+        assert len(pots[0][1]) == 2
+        # Side pot: 500 (only p1 eligible)
+        assert pots[1][0] == 500
+        assert len(pots[1][1]) == 1
+
+    def test_three_player_two_side_pots(self):
+        """Three players with different stacks create 3 pots."""
+        e = _make_engine(3, starting_chips=3000)
+        e.start_new_hand()
+        # p0: 100, p1: 300, p2: 500
+        e.seats[0].bet_this_hand = 100
+        e.seats[0].all_in = True
+        e.seats[1].bet_this_hand = 300
+        e.seats[1].all_in = True
+        e.seats[2].bet_this_hand = 500
+        e.seats[2].all_in = True
+        e.pot = 900
+        pots = e._calculate_pots()
+        assert len(pots) == 3
+        # Main: 100 * 3 = 300, all 3 eligible
+        assert pots[0][0] == 300
+        assert len(pots[0][1]) == 3
+        # Side 1: 200 * 2 = 400, p1 and p2 eligible
+        assert pots[1][0] == 400
+        assert len(pots[1][1]) == 2
+        # Side 2: 200 * 1 = 200, only p2
+        assert pots[2][0] == 200
+        assert len(pots[2][1]) == 1
+
+    def test_folded_player_contributes_to_pot(self):
+        """A folded player's bet goes into the pot but they can't win."""
+        e = _make_engine(3, starting_chips=1000)
+        e.start_new_hand()
+        e.seats[0].bet_this_hand = 200
+        e.seats[0].folded = True
+        e.seats[1].bet_this_hand = 500
+        e.seats[1].all_in = True
+        e.seats[2].bet_this_hand = 500
+        e.pot = 1200
+        pots = e._calculate_pots()
+        # Only p1 and p2 are in hand (p0 folded)
+        # Contribution levels from in-hand: 500
+        # Main pot: p0 contributes 200, p1 contributes 500, p2 contributes 500 = 1200
+        assert len(pots) == 1
+        assert pots[0][0] == 1200
+        # Only p1 and p2 are eligible (p0 folded)
+        eligible_ids = {e.seats[i].player_id for i in pots[0][1]}
+        assert "p0" not in eligible_ids
+        assert "p1" in eligible_ids
+        assert "p2" in eligible_ids
+
+    def test_showdown_tie_with_unequal_stacks(self):
+        """The user's exact scenario: tie with unequal all-ins returns excess.
+
+        p0: 2500 chips bet, p1: 7500 chips bet. Tie.
+        Expected: p0 gets 2500, p1 gets 7500 (unchanged from starting).
+        """
+        e = _make_engine(2, starting_chips=5000, small_blind=0, big_blind=0)
+        e.start_new_hand()
+
+        # Set up state as if both went all-in with unequal stacks
+        e.seats[0].chips = 0
+        e.seats[0].bet_this_hand = 2500
+        e.seats[0].all_in = True
+        e.seats[1].chips = 0
+        e.seats[1].bet_this_hand = 7500
+        e.seats[1].all_in = True
+        e.pot = 10000
+
+        # Give them identical-ranked hands to guarantee a tie
+        e.seats[0].hole_cards = [Card(Rank.ACE, Suit.HEARTS), Card(Rank.KING, Suit.HEARTS)]
+        e.seats[1].hole_cards = [Card(Rank.ACE, Suit.DIAMONDS), Card(Rank.KING, Suit.DIAMONDS)]
+        e.community_cards = [
+            Card(Rank.TWO, Suit.CLUBS),
+            Card(Rank.THREE, Suit.CLUBS),
+            Card(Rank.SEVEN, Suit.SPADES),
+            Card(Rank.NINE, Suit.SPADES),
+            Card(Rank.JACK, Suit.CLUBS),
+        ]
+
+        # Directly invoke showdown
+        e._showdown()
+
+        assert not e.hand_active
+        # p0 should have 2500 (half of main pot 5000)
+        # p1 should have 7500 (half of main pot 5000 + side pot 5000)
+        assert e.seats[0].chips == 2500
+        assert e.seats[1].chips == 7500
+
+    def test_chip_conservation_with_side_pots(self):
+        """Total chips are conserved through a side pot showdown."""
+        e = _make_engine(3, starting_chips=1000, small_blind=0, big_blind=0)
+        e.start_new_hand()
+
+        # Set unequal stacks
+        e.seats[0].chips = 200
+        e.seats[1].chips = 500
+        e.seats[2].chips = 1000
+        e.pot = 0
+        e.current_bet = 0
+        for s in e.seats:
+            s.bet_this_round = 0
+            s.bet_this_hand = 0
+
+        total_chips = 200 + 500 + 1000
+
+        # p2 goes all-in
+        e.action_on_idx = 2
+        e.process_action("p2", "all_in")
+        # p0 calls all-in (200)
+        e.action_on_idx = 0
+        e.process_action("p0", "call")
+        # p1 calls all-in (500)
+        e.action_on_idx = 1
+        e.process_action("p1", "call")
+
+        # Hand should be over (all players all-in)
+        assert not e.hand_active
+        # Chips must be conserved
+        total_after = sum(s.chips for s in e.seats)
+        assert total_after == total_chips
