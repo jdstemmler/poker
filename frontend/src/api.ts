@@ -33,6 +33,7 @@ export function createGame(data: {
   max_players?: number;
   allow_rebuys?: boolean;
   turn_timeout?: number;
+  blind_level_duration?: number;
 }): Promise<CreateGameResponse> {
   return request("/api/games", {
     method: "POST",

@@ -17,6 +17,7 @@ export interface GameSettings {
   max_players: number;
   allow_rebuys: boolean;
   turn_timeout: number;
+  blind_level_duration: number;
 }
 
 export interface GameState {
@@ -107,6 +108,13 @@ export interface EngineState {
   turn_timeout: number;
   action_deadline: number | null;
   auto_deal_deadline: number | null;
+  game_started_at: number | null;
+  small_blind: number;
+  big_blind: number;
+  blind_level: number;
+  blind_level_duration: number;
+  blind_schedule: number[][];
+  next_blind_change_at: number | null;
 }
 
 /** WebSocket message wrapper. */

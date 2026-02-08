@@ -139,6 +139,7 @@ export default function LobbyPage() {
         <span className="pill">👥 Max {game.settings.max_players}</span>
         {game.settings.allow_rebuys && <span className="pill">🔄 Rebuys</span>}
         {game.settings.turn_timeout > 0 && <span className="pill">⏱ {game.settings.turn_timeout}s</span>}
+        {game.settings.blind_level_duration > 0 && <span className="pill">📈 Blinds every {game.settings.blind_level_duration}m</span>}
       </div>
 
       <div className="player-list">

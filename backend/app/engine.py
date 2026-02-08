@@ -120,6 +120,21 @@ class HandHistory:
 class GameEngine:
     """Manages a single poker table/game."""
 
+    # Default blind schedule: each entry is (small_blind, big_blind)
+    DEFAULT_BLIND_SCHEDULE: list[tuple[int, int]] = [
+        (10, 20),
+        (15, 30),
+        (20, 40),
+        (30, 60),
+        (50, 100),
+        (75, 150),
+        (100, 200),
+        (150, 300),
+        (200, 400),
+        (300, 600),
+        (500, 1000),
+    ]
+
     def __init__(
         self,
         game_code: str,
@@ -129,6 +144,8 @@ class GameEngine:
         big_blind: int,
         allow_rebuys: bool = True,
         turn_timeout: int = 0,
+        blind_level_duration: int = 0,
+        blind_schedule: list[tuple[int, int]] | None = None,
     ) -> None:
         self.game_code = game_code
         self.small_blind = small_blind
@@ -136,6 +153,17 @@ class GameEngine:
         self.allow_rebuys = allow_rebuys
         self.starting_chips = starting_chips
         self.turn_timeout = turn_timeout  # 0 = no timer
+
+        # Blind level scheduling
+        self.blind_level_duration: int = blind_level_duration  # minutes, 0 = disabled
+        if blind_schedule is not None:
+            self.blind_schedule: list[tuple[int, int]] = blind_schedule
+        elif blind_level_duration > 0:
+            # Build schedule starting from the initial blinds
+            self.blind_schedule = self._build_schedule_from(small_blind, big_blind)
+        else:
+            self.blind_schedule = []
+        self.blind_level: int = 0  # current index into blind_schedule
 
         # Seat players in order
         self.seats: list[PlayerState] = []
@@ -146,6 +174,9 @@ class GameEngine:
         # Dealer button position (index into self.seats)
         self.dealer_idx: int = 0
         self.hand_number: int = 0
+
+        # When the game started (Unix timestamp, set on first hand)
+        self.game_started_at: Optional[float] = None
 
         # Current hand state
         self.deck: Optional[Deck] = None
@@ -172,6 +203,20 @@ class GameEngine:
 
         # Players who chose to reveal their cards post-hand
         self.shown_cards: set[str] = set()
+
+    @classmethod
+    def _build_schedule_from(
+        cls, start_sb: int, start_bb: int
+    ) -> list[tuple[int, int]]:
+        """Build a blind schedule starting from the given initial blinds.
+
+        Uses the default schedule levels that are >= the starting blinds.
+        """
+        schedule: list[tuple[int, int]] = [(start_sb, start_bb)]
+        for sb, bb in cls.DEFAULT_BLIND_SCHEDULE:
+            if sb > start_sb:
+                schedule.append((sb, bb))
+        return schedule
 
     # ------------------------------------------------------------------
     # Accessors
@@ -229,6 +274,39 @@ class GameEngine:
         else:
             self.auto_deal_deadline = None
 
+    def _maybe_advance_blind_level(self) -> None:
+        """Check elapsed time and advance the blind level if needed."""
+        if (
+            self.blind_level_duration <= 0
+            or not self.blind_schedule
+            or self.game_started_at is None
+        ):
+            return
+
+        elapsed_minutes = (time.time() - self.game_started_at) / 60.0
+        target_level = int(elapsed_minutes // self.blind_level_duration)
+        # Clamp to last level in the schedule
+        target_level = min(target_level, len(self.blind_schedule) - 1)
+
+        if target_level > self.blind_level:
+            self.blind_level = target_level
+            sb, bb = self.blind_schedule[self.blind_level]
+            self.small_blind = sb
+            self.big_blind = bb
+
+    def get_next_blind_change_at(self) -> Optional[float]:
+        """Return the Unix timestamp when the next blind level will start, or None."""
+        if (
+            self.blind_level_duration <= 0
+            or not self.blind_schedule
+            or self.game_started_at is None
+        ):
+            return None
+        if self.blind_level >= len(self.blind_schedule) - 1:
+            return None  # already at max level
+        next_level = self.blind_level + 1
+        return self.game_started_at + (next_level * self.blind_level_duration * 60)
+
     # ------------------------------------------------------------------
     # Hand Lifecycle
     # ------------------------------------------------------------------
@@ -249,6 +327,13 @@ class GameEngine:
 
         self.hand_number += 1
         self.last_hand_result = None
+
+        # Set game start time on first hand
+        if self.game_started_at is None:
+            self.game_started_at = time.time()
+
+        # Check if blinds should increase
+        self._maybe_advance_blind_level()
 
         # Clear auto-deal deadline
         self.auto_deal_deadline = None
@@ -800,6 +885,13 @@ class GameEngine:
             "turn_timeout": self.turn_timeout,
             "action_deadline": self.action_deadline,
             "auto_deal_deadline": self.auto_deal_deadline,
+            "game_started_at": self.game_started_at,
+            "small_blind": self.small_blind,
+            "big_blind": self.big_blind,
+            "blind_level": self.blind_level,
+            "blind_level_duration": self.blind_level_duration,
+            "blind_schedule": [[sb, bb] for sb, bb in self.blind_schedule] if self.blind_schedule else [],
+            "next_blind_change_at": self.get_next_blind_change_at(),
         }
 
     def get_player_view(self, player_id: str) -> dict[str, Any]:
@@ -874,6 +966,10 @@ class GameEngine:
             "action_deadline": self.action_deadline,
             "auto_deal_deadline": self.auto_deal_deadline,
             "auto_deal_delay": self.auto_deal_delay,
+            "game_started_at": self.game_started_at,
+            "blind_level_duration": self.blind_level_duration,
+            "blind_schedule": [[sb, bb] for sb, bb in self.blind_schedule],
+            "blind_level": self.blind_level,
             "community_cards": [c.to_dict() for c in self.community_cards],
             "deck": self.deck.to_dict() if self.deck else None,
             "last_hand_result": self.last_hand_result,
@@ -919,6 +1015,11 @@ class GameEngine:
         engine.action_deadline = data.get("action_deadline")
         engine.auto_deal_deadline = data.get("auto_deal_deadline")
         engine.auto_deal_delay = data.get("auto_deal_delay", 10)
+        engine.game_started_at = data.get("game_started_at")
+        engine.blind_level_duration = data.get("blind_level_duration", 0)
+        raw_schedule = data.get("blind_schedule", [])
+        engine.blind_schedule = [(s[0], s[1]) for s in raw_schedule]
+        engine.blind_level = data.get("blind_level", 0)
         engine.community_cards = [Card.from_dict(c) for c in data["community_cards"]]
         engine.last_hand_result = data.get("last_hand_result")
         deck_data = data.get("deck")

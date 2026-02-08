@@ -12,6 +12,7 @@ export default function CreateGamePage() {
   const [maxPlayers, setMaxPlayers] = useState(9);
   const [allowRebuys, setAllowRebuys] = useState(true);
   const [turnTimeout, setTurnTimeout] = useState(0);
+  const [blindLevelDuration, setBlindLevelDuration] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -29,6 +30,7 @@ export default function CreateGamePage() {
         max_players: maxPlayers,
         allow_rebuys: allowRebuys,
         turn_timeout: turnTimeout,
+        blind_level_duration: blindLevelDuration,
       });
       sessionStorage.setItem("playerId", res.player_id);
       sessionStorage.setItem("playerPin", pin);
@@ -133,6 +135,22 @@ export default function CreateGamePage() {
               />
             </label>
           </div>
+
+          <label>
+            Blind Level Duration (minutes)
+            <input
+              type="number"
+              min={0}
+              max={120}
+              step={1}
+              value={blindLevelDuration}
+              onChange={(e) => setBlindLevelDuration(Number(e.target.value))}
+              placeholder="0 = no increases"
+            />
+            {blindLevelDuration > 0 && (
+              <span className="hint">Blinds increase every {blindLevelDuration} min</span>
+            )}
+          </label>
 
           <label className="checkbox-label">
             <input

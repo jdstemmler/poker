@@ -137,6 +137,61 @@ export default function TablePage() {
     return () => clearInterval(dealTimerRef.current);
   }, [engine?.auto_deal_deadline, engine?.hand_active]);
 
+  // Elapsed game time
+  const [elapsed, setElapsed] = useState("");
+  const elapsedRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  useEffect(() => {
+    clearInterval(elapsedRef.current);
+
+    if (!engine?.game_started_at) {
+      setElapsed("");
+      return;
+    }
+
+    const tick = () => {
+      const secs = Math.max(0, Math.floor(Date.now() / 1000 - engine.game_started_at!));
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      setElapsed(
+        h > 0
+          ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+          : `${m}:${String(s).padStart(2, "0")}`
+      );
+    };
+
+    tick();
+    elapsedRef.current = setInterval(tick, 1000);
+
+    return () => clearInterval(elapsedRef.current);
+  }, [engine?.game_started_at]);
+
+  // Next blind change countdown
+  const [blindCountdown, setBlindCountdown] = useState("");
+  const blindRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  useEffect(() => {
+    clearInterval(blindRef.current);
+
+    if (!engine?.next_blind_change_at) {
+      setBlindCountdown("");
+      return;
+    }
+
+    const tick = () => {
+      const secs = Math.max(0, Math.floor(engine.next_blind_change_at! - Date.now() / 1000));
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      setBlindCountdown(`${m}:${String(s).padStart(2, "0")}`);
+    };
+
+    tick();
+    blindRef.current = setInterval(tick, 1000);
+
+    return () => clearInterval(blindRef.current);
+  }, [engine?.next_blind_change_at]);
+
   if (notAuthenticated) {
     return (
       <div className="page">
@@ -247,9 +302,13 @@ export default function TablePage() {
       <header className="table-header">
         <div className="table-header-left">
           <span className="table-code">{engine.game_code}</span>
-          <span className="table-hand">Hand #{engine.hand_number}</span>
+          <span className="table-hand">Hand #{engine.hand_number}{elapsed ? ` · ${elapsed}` : ""}</span>
         </div>
         <div className="table-header-right">
+          <div className="table-blinds-info">
+            <span className="blinds-value">{engine.small_blind}/{engine.big_blind}</span>
+            {blindCountdown && <span className="blinds-next">Next: {blindCountdown}</span>}
+          </div>
           {connInfo && connInfo.spectator_count > 0 && (
             <span className="spectator-badge">👁 {connInfo.spectator_count}</span>
           )}
