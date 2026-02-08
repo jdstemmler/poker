@@ -271,10 +271,9 @@ class GameEngine:
             p = self.seats[i]
             if p.is_sitting_out:
                 continue
-            if only_active and not p.is_active:
+            if only_active and (not p.is_active or p.folded):
                 continue
-            if not p.folded:
-                return i
+            return i
         return idx  # shouldn't happen
 
     def _set_action_deadline(self) -> None:

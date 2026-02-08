@@ -217,6 +217,35 @@ class TestHeadsUpDealing:
         # Action should be on the dealer (SB position in heads-up)
         assert e.action_on_idx == e.dealer_idx
 
+    def test_heads_up_dealer_rotates_after_fold(self):
+        """Dealer must rotate after the non-dealer folds."""
+        e = _make_engine(2, small_blind=5, big_blind=10)
+        _deal_and_get(e)
+        dealer_hand1 = e.dealer_idx
+        # Dealer (SB) acts first in heads-up; non-dealer is the other seat
+        non_dealer_idx = 1 - dealer_hand1
+        # Dealer folds
+        e.process_action(e.seats[dealer_hand1].player_id, "fold")
+        assert not e.hand_active
+        # Deal next hand — dealer should rotate to the other player
+        e.start_new_hand()
+        assert e.dealer_idx == non_dealer_idx
+
+    def test_heads_up_dealer_rotates_after_non_dealer_folds(self):
+        """Dealer must rotate even when non-dealer folds (the reported bug)."""
+        e = _make_engine(2, small_blind=5, big_blind=10)
+        _deal_and_get(e)
+        dealer_hand1 = e.dealer_idx
+        non_dealer_idx = 1 - dealer_hand1
+        # Dealer calls BB
+        e.process_action(e.seats[e.action_on_idx].player_id, "call")
+        # Non-dealer (BB) folds on flop
+        e.process_action(e.seats[e.action_on_idx].player_id, "fold")
+        assert not e.hand_active
+        # Deal next hand — dealer must rotate
+        e.start_new_hand()
+        assert e.dealer_idx == non_dealer_idx
+
 
 # ── State output ─────────────────────────────────────────────────────
 
