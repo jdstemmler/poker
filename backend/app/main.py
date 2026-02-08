@@ -63,6 +63,8 @@ async def join_game(code: str, req: JoinGameRequest):
         player_id, state = await game_manager.join_game(code.upper(), req)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    # Broadcast updated lobby state so existing players see the new joiner
+    await _broadcast(code.upper(), state)
     return JoinGameResponse(player_id=player_id, game=state)
 
 
