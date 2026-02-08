@@ -27,6 +27,7 @@ export default function TablePage() {
   const [raiseAmount, setRaiseAmount] = useState(0);
   const [showRaisePanel, setShowRaisePanel] = useState(false);
   const [preFold, setPreFold] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const playerId = sessionStorage.getItem("playerId");
   const playerPin = sessionStorage.getItem("playerPin");
@@ -382,8 +383,22 @@ export default function TablePage() {
       {/* Header bar */}
       <header className="table-header">
         <div className="table-header-left">
-          <span className="table-code">{engine.game_code}</span>
-          <span className="table-hand">Hand #{engine.hand_number}{elapsed ? ` · ${elapsed}` : ""}</span>
+          <div className="table-menu-wrapper">
+            <button className="table-menu-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">☰</button>
+            {menuOpen && (
+              <>
+                <div className="table-menu-backdrop" onClick={() => setMenuOpen(false)} />
+                <div className="table-menu-dropdown">
+                  <Link to="/" className="table-menu-item" onClick={() => setMenuOpen(false)}>🏠 Home</Link>
+                  {code && <Link to={`/game/${code}`} className="table-menu-item" onClick={() => setMenuOpen(false)}>📋 Lobby</Link>}
+                </div>
+              </>
+            )}
+          </div>
+          <div className="table-header-info">
+            <span className="table-code">{engine.game_code}</span>
+            <span className="table-hand">Hand #{engine.hand_number}{elapsed ? ` · ${elapsed}` : ""}</span>
+          </div>
         </div>
         {engine.allow_rebuys && (
           <div className="table-header-center">
