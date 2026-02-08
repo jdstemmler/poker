@@ -79,20 +79,20 @@ async def join_game(code: str, req: JoinGameRequest) -> tuple[str, GameState]:
     if game_data is None:
         raise ValueError("Game not found")
 
-    if game_data["status"] != GameStatus.LOBBY.value:
-        raise ValueError("Game is not in lobby state")
-
     players = await redis_client.load_all_players(code)
 
-    # Check if player name already taken
+    # Allow existing players to reconnect regardless of game status
     for p in players:
         if p["name"].lower() == req.player_name.lower():
-            # Allow reconnect if PIN matches
             if _verify_pin(req.player_pin, p["pin_hash"]):
                 state = await _build_game_state(code, game_data)
                 return p["id"], state
             else:
                 raise ValueError("Name already taken (wrong PIN)")
+
+    # New players can only join during lobby
+    if game_data["status"] != GameStatus.LOBBY.value:
+        raise ValueError("Game is not in lobby state")
 
     if len(players) >= game_data["settings"]["max_players"]:
         raise ValueError("Game is full")
