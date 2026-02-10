@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import json
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from app import game_manager, redis_client
+from app import game_manager, metrics, redis_client
 from app.models import (
     CreateGameRequest,
     CreateGameResponse,
@@ -47,13 +56,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------- Admin Auth ----------
+
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
+
+async def verify_admin(authorization: str | None = Header(None)):
+    """Validate the admin password from the Authorization header."""
+    if not ADMIN_PASSWORD:
+        raise HTTPException(
+            status_code=503,
+            detail="Admin not configured. Set ADMIN_PASSWORD env var.",
+        )
+    if not authorization or authorization != f"Bearer {ADMIN_PASSWORD}":
+        raise HTTPException(status_code=401, detail="Invalid admin password")
+
 
 # ---------- REST endpoints ----------
 
 
 @app.post("/api/games", response_model=CreateGameResponse)
-async def create_game(req: CreateGameRequest):
-    code, player_id, state = await game_manager.create_game(req)
+async def create_game(req: CreateGameRequest, request: Request):
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        creator_ip = forwarded.split(",")[0].strip()
+    else:
+        creator_ip = request.client.host if request.client else "unknown"
+    code, player_id, state = await game_manager.create_game(
+        req, creator_ip=creator_ip
+    )
     return CreateGameResponse(code=code, player_id=player_id, game=state)
 
 
@@ -247,10 +278,29 @@ async def toggle_pause(code: str, req: PauseRequest):
 
 
 @app.post("/api/admin/cleanup")
-async def admin_cleanup():
+async def admin_cleanup(_=Depends(verify_admin)):
     """Manually trigger stale-game cleanup. Returns deleted and kept game codes."""
     result = await cleanup_stale_games()
     return result
+
+
+@app.get("/api/admin/summary")
+async def admin_summary(_=Depends(verify_admin)):
+    """Summary stats: games created/cleaned in last 24 h, active count."""
+    return await metrics.get_summary()
+
+
+@app.get("/api/admin/daily-stats")
+async def admin_daily_stats(_=Depends(verify_admin)):
+    """Daily creation counts + completion/abandonment breakdown (30 days)."""
+    return await metrics.get_daily_stats()
+
+
+@app.get("/api/admin/active-games")
+async def admin_active_games(_=Depends(verify_admin)):
+    """Detailed list of all active games. No card data."""
+    games = await metrics.get_active_games_detail()
+    return {"games": games}
 
 
 # ---------- WebSocket ----------

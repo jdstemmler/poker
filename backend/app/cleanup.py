@@ -16,6 +16,7 @@ import time
 from typing import Any
 
 from app import redis_client
+from app import metrics
 from app.engine import GameEngine
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,19 @@ async def cleanup_stale_games() -> dict[str, list[str]]:
             threshold = COMPLETED_THRESHOLD if won else STALE_THRESHOLD
 
             if age >= threshold:
+                # Record metric before deleting
+                game_data = await redis_client.load_game(code)
+                players = await redis_client.load_all_players(code)
+                final_status = (
+                    game_data.get("status", "unknown") if game_data else "unknown"
+                )
+                await metrics.record_game_cleaned(
+                    code=code,
+                    final_status=final_status,
+                    was_completed=won,
+                    player_count=len(players),
+                )
+
                 await redis_client.delete_game(code)
                 logger.info(
                     "Cleaned up game %s (age=%.1fh, won=%s)",
@@ -88,6 +102,14 @@ async def cleanup_stale_games() -> dict[str, list[str]]:
             kept.append(code)
 
     return {"deleted": deleted, "kept": kept}
+
+
+async def _prune_metrics() -> None:
+    """Prune old metrics entries (called after each cleanup pass)."""
+    try:
+        await metrics.prune_old_metrics()
+    except Exception:
+        logger.exception("Failed to prune old metrics")
 
 
 class GameCleaner:
@@ -112,6 +134,7 @@ class GameCleaner:
                 await asyncio.sleep(CLEANUP_INTERVAL)
                 try:
                     result = await cleanup_stale_games()
+                    await _prune_metrics()
                     if result["deleted"]:
                         logger.info(
                             "Cleanup pass: deleted %d game(s): %s",

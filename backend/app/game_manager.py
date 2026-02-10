@@ -5,10 +5,11 @@ from __future__ import annotations
 import hashlib
 import random
 import string
+import time
 import uuid
 from typing import Any, Optional
 
-from app import redis_client
+from app import metrics, redis_client
 from app.engine import GameEngine
 from app.models import (
     CreateGameRequest,
@@ -33,7 +34,9 @@ def _verify_pin(pin: str, pin_hash: str) -> bool:
     return _hash_pin(pin) == pin_hash
 
 
-async def create_game(req: CreateGameRequest) -> tuple[str, str, GameState]:
+async def create_game(
+    req: CreateGameRequest, creator_ip: str = "unknown"
+) -> tuple[str, str, GameState]:
     """Create a new game and return (code, player_id, game_state)."""
     code = _generate_code()
 
@@ -47,6 +50,8 @@ async def create_game(req: CreateGameRequest) -> tuple[str, str, GameState]:
         "code": code,
         "status": GameStatus.LOBBY.value,
         "creator_id": player_id,
+        "creator_ip": creator_ip,
+        "created_at": time.time(),
         "settings": {
             "starting_chips": req.starting_chips,
             "small_blind": req.small_blind,
@@ -74,6 +79,7 @@ async def create_game(req: CreateGameRequest) -> tuple[str, str, GameState]:
     await redis_client.store_game(code, game_data)
     await redis_client.store_player(code, player_id, player_data)
     await redis_client.touch_activity(code)
+    await metrics.record_game_created(code, creator_ip)
 
     state = await _build_game_state(code, game_data)
     return code, player_id, state
