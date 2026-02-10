@@ -12,6 +12,7 @@ services:
       - "8000:8000"
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
     depends_on:
       - redis
 

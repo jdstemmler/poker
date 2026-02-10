@@ -4,6 +4,7 @@ import CreateGamePage from "./pages/CreateGamePage";
 import JoinGamePage from "./pages/JoinGamePage";
 import LobbyPage from "./pages/LobbyPage";
 import TablePage from "./pages/TablePage";
+import AdminPage from "./pages/AdminPage";
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/join/:code" element={<JoinGamePage />} />
         <Route path="/game/:code" element={<LobbyPage />} />
         <Route path="/game/:code/table" element={<TablePage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </BrowserRouter>
   );

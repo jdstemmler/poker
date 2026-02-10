@@ -31,6 +31,7 @@ from app.models import CreateGameRequest, JoinGameRequest, GameStatus
 # ---------------------------------------------------------------------------
 
 PATCH_BASE = "app.game_manager.redis_client"
+PATCH_METRICS = "app.game_manager.metrics"
 
 
 def _pin_hash(pin: str = "1234") -> str:
@@ -106,12 +107,14 @@ class TestCreateGame:
              patch(f"{PATCH_BASE}.store_game", new_callable=AsyncMock) as m2, \
              patch(f"{PATCH_BASE}.store_player", new_callable=AsyncMock) as m3, \
              patch(f"{PATCH_BASE}.touch_activity", new_callable=AsyncMock) as m4, \
-             patch(f"{PATCH_BASE}.load_all_players", new_callable=AsyncMock) as m5:
+             patch(f"{PATCH_BASE}.load_all_players", new_callable=AsyncMock) as m5, \
+             patch(f"{PATCH_METRICS}.record_game_created", new_callable=AsyncMock) as m6:
             self.load_game = m1
             self.store_game = m2
             self.store_player = m3
             self.touch_activity = m4
             self.load_all_players = m5
+            self.record_game_created = m6
             yield
 
     async def test_returns_code_player_id_state(self):
