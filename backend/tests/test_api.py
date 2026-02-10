@@ -225,6 +225,44 @@ class TestStartGameEndpoint:
         assert resp.json()["status"] == "active"
 
 
+class TestLeaveGameEndpoint:
+    @pytest.fixture(autouse=True)
+    def _mock(self):
+        with patch(f"{PATCH_GM}.leave_game", new_callable=AsyncMock) as m1, \
+             patch("app.main._broadcast", new_callable=AsyncMock) as m2:
+            self.leave_game = m1
+            self.broadcast = m2
+            yield
+
+    async def test_leave_game_success(self):
+        self.leave_game.return_value = _sample_game_state()
+
+        async with AsyncClient(
+            transport=ASGITransport(app=fastapi_app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/games/ABC123/leave",
+                json={"player_id": "p2", "pin": "5678"},
+            )
+
+        assert resp.status_code == 200
+        self.broadcast.assert_called_once()
+
+    async def test_leave_game_error(self):
+        self.leave_game.side_effect = ValueError("The game creator cannot leave the lobby")
+
+        async with AsyncClient(
+            transport=ASGITransport(app=fastapi_app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/games/ABC123/leave",
+                json={"player_id": "p1", "pin": "1234"},
+            )
+
+        assert resp.status_code == 400
+        assert "creator" in resp.json()["detail"]
+
+
 class TestActionEndpoint:
     @pytest.fixture(autouse=True)
     def _mock(self):

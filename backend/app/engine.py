@@ -89,6 +89,16 @@ class PlayerState:
         return d
 
 
+def _round_blind(value: float) -> int:
+    """Round a blind value to a clean number."""
+    v = int(round(value))
+    if v >= 100:
+        return round(v / 10) * 10  # round to nearest 10
+    if v >= 10:
+        return round(v / 5) * 5  # round to nearest 5
+    return max(1, v)
+
+
 class HandHistory:
     """Records actions for a single hand."""
 
@@ -154,8 +164,10 @@ class GameEngine:
         turn_timeout: int = 0,
         blind_level_duration: int = 0,
         blind_schedule: list[tuple[int, int]] | None = None,
+        blind_multiplier: float = 2.0,
         max_rebuys: int = 1,
         rebuy_cutoff_minutes: int = 60,
+        auto_deal_enabled: bool = True,
     ) -> None:
         self.game_code = game_code
         self.small_blind = small_blind
@@ -168,11 +180,14 @@ class GameEngine:
 
         # Blind level scheduling
         self.blind_level_duration: int = blind_level_duration  # minutes, 0 = disabled
+        self.blind_multiplier: float = blind_multiplier
         if blind_schedule is not None:
             self.blind_schedule: list[tuple[int, int]] = blind_schedule
         elif blind_level_duration > 0:
             # Build schedule starting from the initial blinds
-            self.blind_schedule = self._build_schedule_from(small_blind, big_blind)
+            self.blind_schedule = self._build_schedule_from(
+                small_blind, big_blind, multiplier=blind_multiplier
+            )
         else:
             self.blind_schedule = []
         self.blind_level: int = 0  # current index into blind_schedule
@@ -204,7 +219,7 @@ class GameEngine:
         self.auto_deal_deadline: Optional[float] = None  # Unix timestamp for auto-deal
 
         # Auto-deal delay in seconds (0 = disabled)
-        self.auto_deal_delay: int = 10
+        self.auto_deal_delay: int = 10 if auto_deal_enabled else 0
 
         # History
         self.hand_histories: list[HandHistory] = []
@@ -232,16 +247,30 @@ class GameEngine:
 
     @classmethod
     def _build_schedule_from(
-        cls, start_sb: int, start_bb: int
+        cls, start_sb: int, start_bb: int, multiplier: float = 2.0,
     ) -> list[tuple[int, int]]:
         """Build a blind schedule starting from the given initial blinds.
 
-        Uses the default schedule levels that are >= the starting blinds.
+        Generates 10 levels.  When *multiplier* is 0 the schedule grows by
+        a fixed additive increment equal to the initial blinds each level
+        (e.g. 10/20 → 20/40 → 30/60 …).  Otherwise the blinds are
+        multiplied by *multiplier* each level (e.g. 2.0 doubles).
+
+        Values are rounded to the nearest 5 or 10 for clean numbers.
         """
         schedule: list[tuple[int, int]] = [(start_sb, start_bb)]
-        for sb, bb in cls.DEFAULT_BLIND_SCHEDULE:
-            if sb > start_sb:
-                schedule.append((sb, bb))
+        sb, bb = float(start_sb), float(start_bb)
+        additive = multiplier == 0
+        for _ in range(10):
+            if additive:
+                sb += start_sb
+                bb += start_bb
+            else:
+                sb *= multiplier
+                bb *= multiplier
+            sb_int = _round_blind(sb)
+            bb_int = _round_blind(bb)
+            schedule.append((sb_int, bb_int))
         return schedule
 
     # ------------------------------------------------------------------
@@ -516,9 +545,13 @@ class GameEngine:
                 # Can only go all-in (for a call or less)
                 pass  # already covered by call
             elif max_raise_to < min_raise_to:
-                # Can only all-in for less than min raise
+                # Can't meet min raise — only all-in is possible as a raise
                 actions.append(
-                    {"action": "all_in", "amount": p.chips}
+                    {
+                        "action": "raise",
+                        "min_amount": p.chips,
+                        "max_amount": p.chips,
+                    }
                 )
             else:
                 actions.append(
@@ -1194,6 +1227,7 @@ class GameEngine:
             "blind_level": self.blind_level,
             "blind_level_duration": self.blind_level_duration,
             "blind_schedule": [[sb, bb] for sb, bb in self.blind_schedule] if self.blind_schedule else [],
+            "blind_multiplier": self.blind_multiplier,
             "next_blind_change_at": self.get_next_blind_change_at(),
             "allow_rebuys": self.allow_rebuys,
             "max_rebuys": self.max_rebuys,
@@ -1278,6 +1312,7 @@ class GameEngine:
             "auto_deal_delay": self.auto_deal_delay,
             "game_started_at": self.game_started_at,
             "blind_level_duration": self.blind_level_duration,
+            "blind_multiplier": self.blind_multiplier,
             "blind_schedule": [[sb, bb] for sb, bb in self.blind_schedule],
             "blind_level": self.blind_level,
             "community_cards": [c.to_dict() for c in self.community_cards],
@@ -1338,6 +1373,7 @@ class GameEngine:
         engine.auto_deal_delay = data.get("auto_deal_delay", 10)
         engine.game_started_at = data.get("game_started_at")
         engine.blind_level_duration = data.get("blind_level_duration", 0)
+        engine.blind_multiplier = data.get("blind_multiplier", 2.0)
         raw_schedule = data.get("blind_schedule", [])
         engine.blind_schedule = [(s[0], s[1]) for s in raw_schedule]
         engine.blind_level = data.get("blind_level", 0)

@@ -36,6 +36,8 @@ export function createGame(data: {
   rebuy_cutoff_minutes?: number;
   turn_timeout?: number;
   blind_level_duration?: number;
+  blind_multiplier?: number;
+  auto_deal_enabled?: boolean;
 }): Promise<CreateGameResponse> {
   return request("/api/games", {
     method: "POST",
@@ -72,6 +74,16 @@ export function startGame(
   data: { player_id: string; pin: string }
 ): Promise<GameState> {
   return request(`/api/games/${code}/start`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function leaveGame(
+  code: string,
+  data: { player_id: string; pin: string }
+): Promise<GameState> {
+  return request(`/api/games/${code}/leave`, {
     method: "POST",
     body: JSON.stringify(data),
   });

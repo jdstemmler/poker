@@ -70,6 +70,13 @@ async def load_all_players(code: str) -> list[dict[str, Any]]:
     return players
 
 
+async def remove_player(code: str, player_id: str) -> None:
+    """Remove a player from a game."""
+    r = await get_redis()
+    await r.delete(_player_key(code, player_id))
+    await r.srem(_players_key(code), player_id)
+
+
 def _engine_key(code: str) -> str:
     return f"game:{code}:engine"
 

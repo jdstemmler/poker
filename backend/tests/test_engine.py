@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import patch
 
 from app.cards import Card, Deck, Rank, Suit
-from app.engine import GameEngine, PlayerState, Street, HandHistory
+from app.engine import GameEngine, PlayerState, Street, HandHistory, _round_blind
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -346,6 +346,25 @@ class TestHandHistory:
 
 # ── Blind schedule ───────────────────────────────────────────────────
 
+class TestRoundBlind:
+    def test_small_values(self):
+        assert _round_blind(1) == 1
+        assert _round_blind(3) == 3
+        assert _round_blind(0.4) == 1  # min 1
+
+    def test_round_to_nearest_5(self):
+        assert _round_blind(12) == 10
+        assert _round_blind(13) == 15
+        assert _round_blind(22.5) == 20  # round(22.5)=22, nearest 5=20
+        assert _round_blind(47) == 45
+
+    def test_round_to_nearest_10(self):
+        assert _round_blind(105) == 100  # round(105/10)*10 = 100
+        assert _round_blind(150) == 150
+        assert _round_blind(234) == 230
+        assert _round_blind(999) == 1000
+
+
 class TestBlindSchedule:
     def test_no_schedule_when_duration_zero(self):
         e = _make_engine(3, blind_level_duration=0)
@@ -355,6 +374,40 @@ class TestBlindSchedule:
         e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=15)
         assert len(e.blind_schedule) > 0
         assert e.blind_schedule[0] == (10, 20)
+
+    def test_multiplier_default_doubles(self):
+        """Default multiplier (2.0) should double blinds each level."""
+        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=10)
+        assert len(e.blind_schedule) == 11  # initial + 10 generated
+        assert e.blind_schedule[0] == (10, 20)
+        assert e.blind_schedule[1] == (20, 40)
+        assert e.blind_schedule[2] == (40, 80)
+
+    def test_multiplier_1_5x(self):
+        """1.5× multiplier should increase blinds by 50% each level."""
+        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=10, blind_multiplier=1.5)
+        assert e.blind_schedule[0] == (10, 20)
+        assert e.blind_schedule[1] == (15, 30)
+        # 15 * 1.5 = 22.5 → round to 22 → nearest 5 = 20; 30 * 1.5 = 45
+        assert e.blind_schedule[2] == (20, 45)
+
+    def test_multiplier_additive_linear(self):
+        """multiplier=0 should add initial blinds each level (linear)."""
+        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=10, blind_multiplier=0)
+        assert e.blind_schedule[0] == (10, 20)
+        assert e.blind_schedule[1] == (20, 40)
+        assert e.blind_schedule[2] == (30, 60)
+        assert e.blind_schedule[3] == (40, 80)
+        assert e.blind_schedule[10] == (110, 220)
+
+    def test_multiplier_preserved_in_serialization(self):
+        """blind_multiplier should survive to_dict/from_dict round-trip."""
+        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=10, blind_multiplier=1.5)
+        d = e.to_dict()
+        assert d["blind_multiplier"] == 1.5
+        e2 = GameEngine.from_dict(d)
+        assert e2.blind_multiplier == 1.5
+        assert e2.blind_schedule == e.blind_schedule
 
     def test_custom_schedule(self):
         custom = [(5, 10), (10, 20), (25, 50)]
@@ -385,6 +438,49 @@ class TestBlindSchedule:
             e.process_action(pid, "fold")
         e.pause()
         assert e.get_next_blind_change_at() is None
+
+
+# ── Auto-deal toggle ────────────────────────────────────────────────
+
+class TestAutoDealToggle:
+    def test_auto_deal_enabled_by_default(self):
+        e = _make_engine(3)
+        assert e.auto_deal_delay == 10
+
+    def test_auto_deal_disabled(self):
+        e = _make_engine(3, auto_deal_enabled=False)
+        assert e.auto_deal_delay == 0
+
+    def test_auto_deal_disabled_no_deadline(self):
+        """When auto-deal is disabled, no deadline should be set after hand ends."""
+        e = _make_engine(3, auto_deal_enabled=False)
+        _deal_and_get(e)
+        # End the hand by folding everyone
+        for _ in range(20):
+            if not e.hand_active:
+                break
+            pid = e.seats[e.action_on_idx].player_id
+            e.process_action(pid, "fold")
+        assert e.auto_deal_deadline is None
+
+    def test_auto_deal_enabled_sets_deadline(self):
+        """When auto-deal is enabled, a deadline should be set after hand ends."""
+        e = _make_engine(3, auto_deal_enabled=True)
+        _deal_and_get(e)
+        for _ in range(20):
+            if not e.hand_active:
+                break
+            pid = e.seats[e.action_on_idx].player_id
+            e.process_action(pid, "fold")
+        assert e.auto_deal_deadline is not None
+
+    def test_auto_deal_preserved_in_serialization(self):
+        """auto_deal_delay should survive to_dict/from_dict round-trip."""
+        e = _make_engine(3, auto_deal_enabled=False)
+        d = e.to_dict()
+        assert d["auto_deal_delay"] == 0
+        e2 = GameEngine.from_dict(d)
+        assert e2.auto_deal_delay == 0
 
 
 # ── Pause / Unpause ─────────────────────────────────────────────────

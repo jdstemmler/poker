@@ -88,6 +88,23 @@ async def toggle_ready(code: str, req: ReadyRequest):
     return state
 
 
+class LeaveRequest(BaseModel):
+    player_id: str
+    pin: str = Field(..., pattern=r"^\d{4}$")
+
+
+@app.post("/api/games/{code}/leave")
+async def leave_game(code: str, req: LeaveRequest):
+    """Leave the lobby (non-creator only, before game starts)."""
+    try:
+        state = await game_manager.leave_game(code.upper(), req.player_id, req.pin)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await _broadcast(code.upper(), state)
+    return state
+
+
 @app.post("/api/games/{code}/start")
 async def start_game(code: str, req: StartGameRequest):
     try:
