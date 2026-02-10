@@ -178,7 +178,7 @@ export default function CreateGamePage() {
         </fieldset>
 
         <fieldset className="form-section">
-          <legend>Game Settings</legend>
+          <legend>Chips &amp; Blinds</legend>
           <label>
             Starting Chips
             <NumericInput
@@ -206,27 +206,6 @@ export default function CreateGamePage() {
               />
             </label>
           </div>
-
-          <div className="row">
-            <label>
-              Turn Timer (sec)
-              <NumericInput
-                value={turnTimeout}
-                onChange={setTurnTimeout}
-                placeholder="0 = off"
-              />
-            </label>
-          </div>
-
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={autoDealEnabled}
-              onChange={(e) => setAutoDealEnabled(e.target.checked)}
-            />
-            Auto Deal Next Hand
-            <span className="hint">When enabled, the next hand deals automatically after 10 seconds</span>
-          </label>
 
           <label>
             Blind Level Duration (min)
@@ -272,7 +251,32 @@ export default function CreateGamePage() {
               </div>
             </>
           )}
+        </fieldset>
 
+        <fieldset className="form-section">
+          <legend>Timing</legend>
+          <label>
+            Turn Timer (sec)
+            <NumericInput
+              value={turnTimeout}
+              onChange={setTurnTimeout}
+              placeholder="0 = off"
+            />
+          </label>
+
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={autoDealEnabled}
+              onChange={(e) => setAutoDealEnabled(e.target.checked)}
+            />
+            Auto Deal Next Hand
+            <span className="hint">When enabled, the next hand deals automatically after 10 seconds</span>
+          </label>
+        </fieldset>
+
+        <fieldset className="form-section">
+          <legend>Rebuys</legend>
           <label className="checkbox-label">
             <input
               type="checkbox"
@@ -334,6 +338,19 @@ export default function CreateGamePage() {
             The forced bets posted each hand. The big blind is typically 2× the
             small blind.
           </dd>
+          <dt>Blind Level Duration</dt>
+          <dd>
+            Minutes between blind increases. Set to <strong>0</strong> for fixed blinds.
+          </dd>
+          <dt>Blind Multiplier</dt>
+          <dd>
+            How much the blinds multiply each level (e.g. 2× means blinds
+            double). Only applies when blind level duration is set.
+          </dd>
+        </dl>
+
+        <h3>Timing</h3>
+        <dl>
           <dt>Turn Timer</dt>
           <dd>
             Seconds each player has to act. When time runs out, the player
@@ -344,15 +361,10 @@ export default function CreateGamePage() {
             When enabled, the next hand is dealt automatically after a 10-second
             delay. When disabled, the host must deal each hand manually.
           </dd>
-          <dt>Blind Level Duration</dt>
-          <dd>
-            Minutes between blind increases. Set to <strong>0</strong> for fixed blinds.
-          </dd>
-          <dt>Blind Multiplier</dt>
-          <dd>
-            How much the blinds multiply each level (e.g. 2× means blinds
-            double). Only applies when blind level duration is set.
-          </dd>
+        </dl>
+
+        <h3>Rebuys</h3>
+        <dl>
           <dt>Allow Rebuys</dt>
           <dd>
             When enabled, busted players (0 chips) can rebuy back to the starting
