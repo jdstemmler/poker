@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.1.0] — 2026-02-10
 
 ### Fixed
 - **All-in action logic**: When a player can't meet the minimum re-raise but has
