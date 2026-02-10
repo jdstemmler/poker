@@ -57,6 +57,7 @@ async def create_game(req: CreateGameRequest) -> tuple[str, str, GameState]:
             "rebuy_cutoff_minutes": req.rebuy_cutoff_minutes,
             "turn_timeout": req.turn_timeout,
             "blind_level_duration": req.blind_level_duration,
+            "blind_multiplier": req.blind_multiplier,
         },
     }
 
@@ -174,6 +175,7 @@ async def start_game(code: str, player_id: str, pin: str) -> GameState:
         rebuy_cutoff_minutes=game_data["settings"].get("rebuy_cutoff_minutes", 60),
         turn_timeout=game_data["settings"].get("turn_timeout", 0),
         blind_level_duration=game_data["settings"].get("blind_level_duration", 0),
+        blind_multiplier=game_data["settings"].get("blind_multiplier", 2.0),
     )
     engine_state = engine.start_new_hand()
     await redis_client.store_engine(code, engine.to_dict())
@@ -187,6 +189,27 @@ async def get_game_state(code: str) -> Optional[GameState]:
     game_data = await redis_client.load_game(code)
     if game_data is None:
         return None
+    return await _build_game_state(code, game_data)
+
+
+async def leave_game(code: str, player_id: str, pin: str) -> GameState:
+    """Remove a player from the lobby. Only allowed before the game starts."""
+    game_data = await redis_client.load_game(code)
+    if game_data is None:
+        raise ValueError("Game not found")
+    if game_data["status"] != GameStatus.LOBBY.value:
+        raise ValueError("Cannot leave once the game has started")
+    if game_data["creator_id"] == player_id:
+        raise ValueError("The game creator cannot leave the lobby")
+
+    player_data = await redis_client.load_player(code, player_id)
+    if player_data is None:
+        raise ValueError("Player not found")
+    if not _verify_pin(pin, player_data["pin_hash"]):
+        raise ValueError("Invalid PIN")
+
+    await redis_client.remove_player(code, player_id)
+
     return await _build_game_state(code, game_data)
 
 

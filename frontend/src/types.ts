@@ -20,6 +20,7 @@ export interface GameSettings {
   rebuy_cutoff_minutes: number;
   turn_timeout: number;
   blind_level_duration: number;
+  blind_multiplier: number;
 }
 
 export interface GameState {

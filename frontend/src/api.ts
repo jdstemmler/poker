@@ -77,6 +77,16 @@ export function startGame(
   });
 }
 
+export function leaveGame(
+  code: string,
+  data: { player_id: string; pin: string }
+): Promise<GameState> {
+  return request(`/api/games/${code}/leave`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 // --- Engine / Game endpoints (Phase 2) ---
 
 export function getEngineState(

@@ -9,6 +9,7 @@ import pytest
 from app.game_manager import (
     create_game,
     join_game,
+    leave_game,
     toggle_ready,
     start_game,
     get_game_state,
@@ -706,3 +707,54 @@ class TestSetPlayerConnected:
         self.load_player.return_value = None
         await set_player_connected("ABC123", "p1", True)
         self.store_player.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# leave_game
+# ---------------------------------------------------------------------------
+
+
+class TestLeaveGame:
+    @pytest.fixture(autouse=True)
+    def _mock_redis(self):
+        with patch(f"{PATCH_BASE}.load_game", new_callable=AsyncMock) as m1, \
+             patch(f"{PATCH_BASE}.load_player", new_callable=AsyncMock) as m2, \
+             patch(f"{PATCH_BASE}.remove_player", new_callable=AsyncMock) as m3, \
+             patch(f"{PATCH_BASE}.load_all_players", new_callable=AsyncMock) as m4:
+            self.load_game = m1
+            self.load_player = m2
+            self.remove_player = m3
+            self.load_all_players = m4
+            yield
+
+    async def test_leave_game_success(self):
+        self.load_game.return_value = _make_game_data(creator_id="p1")
+        self.load_player.return_value = _make_player_data("p2", "Bob", "5678")
+        self.load_all_players.return_value = [
+            _make_player_data("p1", "Alice", "1234", is_creator=True),
+        ]
+
+        state = await leave_game("ABC123", "p2", "5678")
+        self.remove_player.assert_awaited_once_with("ABC123", "p2")
+
+    async def test_leave_game_not_found(self):
+        self.load_game.return_value = None
+        with pytest.raises(ValueError, match="Game not found"):
+            await leave_game("ABC123", "p2", "5678")
+
+    async def test_leave_game_active(self):
+        self.load_game.return_value = _make_game_data(status="active")
+        with pytest.raises(ValueError, match="Cannot leave"):
+            await leave_game("ABC123", "p2", "5678")
+
+    async def test_leave_game_creator_blocked(self):
+        self.load_game.return_value = _make_game_data(creator_id="p1")
+        self.load_player.return_value = _make_player_data("p1", "Alice", "1234", is_creator=True)
+        with pytest.raises(ValueError, match="creator cannot leave"):
+            await leave_game("ABC123", "p1", "1234")
+
+    async def test_leave_game_wrong_pin(self):
+        self.load_game.return_value = _make_game_data(creator_id="p1")
+        self.load_player.return_value = _make_player_data("p2", "Bob", "5678")
+        with pytest.raises(ValueError, match="Invalid PIN"):
+            await leave_game("ABC123", "p2", "0000")

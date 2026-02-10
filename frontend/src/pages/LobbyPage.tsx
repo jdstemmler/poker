@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { buildWsUrl, getGame, startGame } from "../api";
+import { buildWsUrl, getGame, startGame, leaveGame } from "../api";
 import { useGameSocket } from "../useGameSocket";
 import type { GameState, ConnectionInfo } from "../types";
 
@@ -129,14 +129,13 @@ export default function LobbyPage() {
       </div>
 
       <div className="settings-pills">
-        <span className="pill">💰 {game.settings.starting_chips}</span>
-        <span className="pill">🎯 {game.settings.small_blind}/{game.settings.big_blind}</span>
-        <span className="pill">👥 Max {game.settings.max_players}</span>
+        <span className="pill">{game.settings.starting_chips} chips</span>
+        <span className="pill">{game.settings.small_blind}/{game.settings.big_blind} blinds</span>
         {game.settings.allow_rebuys && (
           <span className="pill">🔄 Rebuys{game.settings.max_rebuys > 0 ? ` ×${game.settings.max_rebuys}` : ""}{game.settings.rebuy_cutoff_minutes > 0 ? ` (${game.settings.rebuy_cutoff_minutes}m)` : ""}</span>
         )}
         {game.settings.turn_timeout > 0 && <span className="pill">⏱ {game.settings.turn_timeout}s</span>}
-        {game.settings.blind_level_duration > 0 && <span className="pill">📈 Blinds every {game.settings.blind_level_duration}m</span>}
+        {game.settings.blind_level_duration > 0 && <span className="pill">📈 Blinds every {game.settings.blind_level_duration}m ({game.settings.blind_multiplier}×)</span>}
       </div>
 
       <div className="player-list">
@@ -176,6 +175,29 @@ export default function LobbyPage() {
             title={!canStart ? "Need at least 2 players" : ""}
           >
             Start Game
+          </button>
+        )}
+        {!isCreator && (
+          <button
+            className="btn btn-secondary btn-lg"
+            onClick={async () => {
+              if (!code || !playerId || !playerPin) return;
+              setActionLoading(true);
+              try {
+                await leaveGame(code, { player_id: playerId, pin: playerPin });
+                sessionStorage.removeItem("playerId");
+                sessionStorage.removeItem("playerPin");
+                sessionStorage.removeItem("playerName");
+                navigate(`/join/${code}`);
+              } catch (err: any) {
+                setError(err.message);
+              } finally {
+                setActionLoading(false);
+              }
+            }}
+            disabled={actionLoading}
+          >
+            Leave Lobby
           </button>
         )}
       </div>

@@ -1,7 +1,90 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createGame } from "../api";
 import HelpModal from "../components/HelpModal";
+
+/** Numeric input that avoids leading zeros and selects all on focus. */
+function NumericInput({
+  value,
+  onChange,
+  placeholder,
+  ...rest
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  placeholder?: string;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "placeholder">) {
+  const [display, setDisplay] = useState(String(value));
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
+      // Allow empty field (will parse as 0 / use placeholder default)
+      if (raw === "" || raw === "-") {
+        setDisplay(raw);
+        onChange(0);
+        return;
+      }
+      const n = Number(raw);
+      if (!isNaN(n)) {
+        setDisplay(raw.replace(/^0+(?=\d)/, "")); // strip leading zeros
+        onChange(n);
+      }
+    },
+    [onChange],
+  );
+
+  const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.select();
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    // On blur, show the current numeric value (no empty fields)
+    setDisplay(String(value));
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={display}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      placeholder={placeholder}
+      {...rest}
+    />
+  );
+}
+
+/** Mirror the backend _round_blind logic for preview.
+ *  Uses banker's rounding to match Python's round(). */
+function bankersRound(n: number): number {
+  const floor = Math.floor(n);
+  const frac = n - floor;
+  if (Math.abs(frac - 0.5) < 1e-9) return floor % 2 === 0 ? floor : floor + 1;
+  return Math.round(n);
+}
+
+function roundBlind(value: number): number {
+  const v = bankersRound(value);
+  if (v >= 100) return bankersRound(v / 10) * 10;
+  if (v >= 10) return bankersRound(v / 5) * 5;
+  return Math.max(1, v);
+}
+
+/** Build a blind schedule preview (same algorithm as backend). */
+function buildSchedulePreview(startSb: number, startBb: number, multiplier: number): [number, number][] {
+  const schedule: [number, number][] = [[startSb, startBb]];
+  let sb = startSb;
+  let bb = startBb;
+  for (let i = 0; i < 10; i++) {
+    sb *= multiplier;
+    bb *= multiplier;
+    schedule.push([roundBlind(sb), roundBlind(bb)]);
+  }
+  return schedule;
+}
 
 export default function CreateGamePage() {
   const navigate = useNavigate();
@@ -11,12 +94,12 @@ export default function CreateGamePage() {
   const [startingChips, setStartingChips] = useState(1000);
   const [smallBlind, setSmallBlind] = useState(10);
   const [bigBlind, setBigBlind] = useState(20);
-  const [maxPlayers, setMaxPlayers] = useState(9);
   const [allowRebuys, setAllowRebuys] = useState(true);
   const [maxRebuys, setMaxRebuys] = useState(1);
   const [rebuyCutoffMinutes, setRebuyCutoffMinutes] = useState(60);
   const [turnTimeout, setTurnTimeout] = useState(0);
   const [blindLevelDuration, setBlindLevelDuration] = useState(0);
+  const [blindMultiplier, setBlindMultiplier] = useState(2.0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -31,12 +114,12 @@ export default function CreateGamePage() {
         starting_chips: startingChips,
         small_blind: smallBlind,
         big_blind: bigBlind,
-        max_players: maxPlayers,
         allow_rebuys: allowRebuys,
         max_rebuys: allowRebuys ? maxRebuys : 0,
         rebuy_cutoff_minutes: allowRebuys ? rebuyCutoffMinutes : 0,
         turn_timeout: turnTimeout,
         blind_level_duration: blindLevelDuration,
+        blind_multiplier: blindLevelDuration > 0 ? blindMultiplier : 2.0,
       });
       sessionStorage.setItem("playerId", res.player_id);
       sessionStorage.setItem("playerPin", pin);
@@ -73,7 +156,7 @@ export default function CreateGamePage() {
           </label>
 
           <label>
-            4-Digit PIN
+            Choose a 4-Digit PIN
             <input
               type="text"
               inputMode="numeric"
@@ -84,10 +167,11 @@ export default function CreateGamePage() {
               maxLength={4}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              placeholder="1234"
+              placeholder="Pick any 4 digits"
               className="pin-input"
               required
             />
+            <span className="hint">This is YOUR password — pick any 4 digits and remember them</span>
           </label>
         </fieldset>
 
@@ -95,77 +179,87 @@ export default function CreateGamePage() {
           <legend>Game Settings</legend>
           <label>
             Starting Chips
-            <input
-              type="number"
-              min={100}
-              max={100000}
-              step={100}
+            <NumericInput
               value={startingChips}
-              onChange={(e) => setStartingChips(Number(e.target.value))}
+              onChange={setStartingChips}
+              placeholder="1000"
             />
           </label>
 
           <div className="row">
             <label>
               Small Blind
-              <input
-                type="number"
-                min={1}
+              <NumericInput
                 value={smallBlind}
-                onChange={(e) => setSmallBlind(Number(e.target.value))}
+                onChange={setSmallBlind}
+                placeholder="10"
               />
             </label>
             <label>
               Big Blind
-              <input
-                type="number"
-                min={2}
+              <NumericInput
                 value={bigBlind}
-                onChange={(e) => setBigBlind(Number(e.target.value))}
+                onChange={setBigBlind}
+                placeholder="20"
               />
             </label>
           </div>
 
           <div className="row">
             <label>
-              Max Players
-              <input
-                type="number"
-                min={2}
-                max={9}
-                value={maxPlayers}
-                onChange={(e) => setMaxPlayers(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              Turn Timer
-              <input
-                type="number"
-                min={0}
-                max={300}
-                step={5}
+              Turn Timer (sec)
+              <NumericInput
                 value={turnTimeout}
-                onChange={(e) => setTurnTimeout(Number(e.target.value))}
+                onChange={setTurnTimeout}
                 placeholder="0 = off"
               />
             </label>
           </div>
 
           <label>
-            Blind Level Duration (minutes)
-            <input
-              type="number"
-              min={0}
-              max={120}
-              step={1}
+            Blind Level Duration (min)
+            <NumericInput
               value={blindLevelDuration}
-              onChange={(e) => setBlindLevelDuration(Number(e.target.value))}
+              onChange={setBlindLevelDuration}
               placeholder="0 = no increases"
             />
             {blindLevelDuration > 0 && (
               <span className="hint">Blinds increase every {blindLevelDuration} min</span>
             )}
           </label>
+
+          {blindLevelDuration > 0 && (
+            <>
+              <label>
+                Blind Multiplier
+                <div className="multiplier-options">
+                  {[1.5, 2, 3, 4].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      className={`multiplier-btn${blindMultiplier === m ? " active" : ""}`}
+                      onClick={() => setBlindMultiplier(m)}
+                    >
+                      {m}×
+                    </button>
+                  ))}
+                </div>
+                <span className="hint">Blinds multiply by {blindMultiplier}× each level</span>
+              </label>
+
+              <div className="blind-schedule-preview">
+                <span className="schedule-title">Blind Schedule Preview</span>
+                <div className="schedule-table">
+                  {buildSchedulePreview(smallBlind, bigBlind, blindMultiplier).map(([sb, bb], i) => (
+                    <div key={i} className={`schedule-row${i === 0 ? " current" : ""}`}>
+                      <span className="schedule-level">L{i + 1}</span>
+                      <span className="schedule-blinds">{sb}/{bb}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           <label className="checkbox-label">
             <input
@@ -180,25 +274,18 @@ export default function CreateGamePage() {
             <div className="row rebuy-options">
               <label>
                 Max Rebuys
-                <input
-                  type="number"
-                  min={0}
-                  max={99}
+                <NumericInput
                   value={maxRebuys}
-                  onChange={(e) => setMaxRebuys(Number(e.target.value))}
+                  onChange={setMaxRebuys}
                   placeholder="0 = unlimited"
                 />
                 <span className="hint">{maxRebuys === 0 ? "Unlimited" : `${maxRebuys} allowed`}</span>
               </label>
               <label>
                 Rebuy Cutoff (min)
-                <input
-                  type="number"
-                  min={0}
-                  max={480}
-                  step={5}
+                <NumericInput
                   value={rebuyCutoffMinutes}
-                  onChange={(e) => setRebuyCutoffMinutes(Number(e.target.value))}
+                  onChange={setRebuyCutoffMinutes}
                   placeholder="0 = no cutoff"
                 />
                 <span className="hint">{rebuyCutoffMinutes === 0 ? "No cutoff" : `${rebuyCutoffMinutes} min`}</span>
@@ -221,8 +308,8 @@ export default function CreateGamePage() {
           <dd>Your display name at the table (up to 20 characters).</dd>
           <dt>4-Digit PIN</dt>
           <dd>
-            A simple password for your seat. You'll need it to reconnect if you
-            drop — remember it!
+            <strong>You choose this yourself</strong> — pick any four digits.
+            You'll need it to reconnect if you drop — remember it!
           </dd>
         </dl>
 
@@ -235,8 +322,6 @@ export default function CreateGamePage() {
             The forced bets posted each hand. The big blind is typically 2× the
             small blind.
           </dd>
-          <dt>Max Players</dt>
-          <dd>Seats available at the table (4–9).</dd>
           <dt>Turn Timer</dt>
           <dd>
             Seconds each player has to act. When time runs out, the player
@@ -244,8 +329,12 @@ export default function CreateGamePage() {
           </dd>
           <dt>Blind Level Duration</dt>
           <dd>
-            Minutes between blind increases. The blinds double at each level
-            on an auto-generated schedule. Set to <strong>0</strong> for fixed blinds.
+            Minutes between blind increases. Set to <strong>0</strong> for fixed blinds.
+          </dd>
+          <dt>Blind Multiplier</dt>
+          <dd>
+            How much the blinds multiply each level (e.g. 2× means blinds
+            double). Only applies when blind level duration is set.
           </dd>
           <dt>Allow Rebuys</dt>
           <dd>

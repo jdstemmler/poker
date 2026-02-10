@@ -90,7 +90,7 @@ export default function JoinGamePage() {
         </label>
 
         <label>
-          4-Digit PIN
+          Choose a 4-Digit PIN
           <input
             type="text"
             inputMode="numeric"
@@ -101,10 +101,11 @@ export default function JoinGamePage() {
             maxLength={4}
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-            placeholder="1234"
+            placeholder="Pick any 4 digits"
             className="pin-input"
             required
           />
+          <span className="hint">This is YOUR password — pick any 4 digits and remember them</span>
         </label>
 
         {error && <p className="error">{error}</p>}
@@ -144,9 +145,9 @@ export default function JoinGamePage() {
           </dd>
           <dt>4-Digit PIN</dt>
           <dd>
-            A simple password that secures your seat. If you get disconnected,
-            use the <strong>same name and PIN</strong> to reconnect — even if the
-            game has already started.
+            <strong>You choose this yourself</strong> — it is not a code from the
+            game creator. Pick any four digits you'll remember. If you get
+            disconnected, use the <strong>same name and PIN</strong> to reconnect.
           </dd>
         </dl>
 
