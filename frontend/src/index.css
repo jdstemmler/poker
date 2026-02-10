@@ -1342,6 +1342,16 @@ input::placeholder {
   font-style: italic;
 }
 
+.refund-line .winner-name {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.refund-line .winner-detail {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }

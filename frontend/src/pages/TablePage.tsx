@@ -498,6 +498,12 @@ export default function TablePage() {
                 <span className="winner-hand">{w.hand}</span>
               </div>
             ))}
+            {engine.last_hand_result.refunds?.map((r, i) => (
+              <div key={`refund-${i}`} className="winner-line refund-line">
+                <span className="winner-name">{r.name}</span>
+                <span className="winner-detail"><strong>{r.amount}</strong> returned</span>
+              </div>
+            ))}
           </div>
         </div>
       )}

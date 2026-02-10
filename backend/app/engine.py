@@ -870,6 +870,7 @@ class GameEngine:
         # Calculate side pots and award each one
         pots = self._calculate_pots()
         winnings_by_pid: dict[str, int] = {}
+        refunds_by_pid: dict[str, int] = {}
         best_hand_by_pid: dict[str, str] = {}
 
         for pot_amount, eligible_indices in pots:
@@ -879,6 +880,15 @@ class GameEngine:
                 for i in eligible_indices
                 if self.seats[i].player_id in player_hands
             }
+
+            # Single eligible player = uncalled bet refund, not a "win"
+            if len(eligible_hands) == 1:
+                pid = next(iter(eligible_hands))
+                player = self._find_player(pid)
+                if player:
+                    player.chips += pot_amount
+                    refunds_by_pid[pid] = refunds_by_pid.get(pid, 0) + pot_amount
+                continue
 
             pot_winner_ids = determine_winners(eligible_hands)
             if not pot_winner_ids:
@@ -906,8 +916,18 @@ class GameEngine:
             for pid, total in winnings_by_pid.items()
         ]
 
+        result_refunds = [
+            {
+                "player_id": pid,
+                "name": self._find_player(pid).name,
+                "amount": total,
+            }
+            for pid, total in refunds_by_pid.items()
+        ]
+
         self.last_hand_result = {
             "winners": result_winners,
+            "refunds": result_refunds,
             "pot": self.pot,
             "community_cards": [c.to_dict() for c in self.community_cards],
             "player_hands": {

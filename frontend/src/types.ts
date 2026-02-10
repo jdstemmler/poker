@@ -80,8 +80,15 @@ export interface HandResultWinner {
   hand: string;
 }
 
+export interface HandResultRefund {
+  player_id: string;
+  name: string;
+  amount: number;
+}
+
 export interface HandResult {
   winners: HandResultWinner[];
+  refunds?: HandResultRefund[];
   pot: number;
   community_cards: CardData[];
   player_hands: Record<
