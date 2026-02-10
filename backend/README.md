@@ -27,10 +27,11 @@ backend/
 │   ├── ws_manager.py      # WebSocket connection manager + spectators
 │   ├── timer.py           # Background action timer (auto-fold, auto-deal)
 │   ├── cleanup.py         # Background stale-game cleanup (24h inactive)
+│   ├── metrics.py         # Admin metrics tracking (Redis sorted sets)
 │   ├── models.py          # Pydantic request/response models
 │   └── redis_client.py    # Async Redis persistence layer
 ├── tests/
-│   ├── test_engine.py     # Engine tests (237 tests total across all files)
+│   ├── test_engine.py     # Engine tests (272 tests total across all files)
 │   ├── test_actions.py    # Betting action tests
 │   ├── test_api.py        # HTTP endpoint tests
 │   ├── test_cards.py      # Card/Deck tests
@@ -125,7 +126,18 @@ Background task that runs every 30 minutes:
 
 - Removes games inactive for 24+ hours
 - Preserves completed games for 72 hours (so players can review results)
+- Records cleanup metrics before deletion
 - Cleans up associated Redis keys
+
+### `metrics.py` — Admin Metrics
+
+Redis sorted-set–based metrics tracking for the admin dashboard:
+
+- Tracks game creation, completion, and cleanup events with timestamps
+- Provides 24h summary stats (total created, cleaned, active count)
+- Generates daily breakdowns (completed, abandoned, never-started) for charting
+- Returns detailed active game info (code, creator IP, creation time, players, last activity)
+- Automatic 90-day pruning of old metric entries
 
 ### `redis_client.py` — Redis Persistence
 
@@ -221,6 +233,9 @@ docker run -p 8000:8000 -e REDIS_URL=redis://host.docker.internal:6379/0 poker-b
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/admin/cleanup` | Manually trigger stale-game cleanup |
+| `GET` | `/api/admin/summary` | 24h summary metrics (requires Bearer token) |
+| `GET` | `/api/admin/daily-stats` | Daily creation/completion breakdown (requires Bearer token) |
+| `GET` | `/api/admin/active-games` | Active games detail list (requires Bearer token) |
 
 ### WebSocket
 
@@ -239,3 +254,4 @@ Messages are JSON with a `type` field:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection URL |
+| `ADMIN_PASSWORD` | _(none)_ | Password for admin dashboard access (Bearer token) |

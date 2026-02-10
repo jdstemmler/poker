@@ -32,7 +32,8 @@ frontend/
 │   │   ├── CreateGamePage.tsx # Game configuration form
 │   │   ├── JoinGamePage.tsx # Enter name/PIN to join + spectator mode
 │   │   ├── LobbyPage.tsx   # Waiting room, ready up, start
-│   │   └── TablePage.tsx   # Main gameplay view (698 lines)
+│   │   ├── TablePage.tsx   # Main gameplay view (698 lines)
+│   │   └── AdminPage.tsx   # Admin dashboard (password-protected)
 │   └── components/
 │       ├── CardDisplay.tsx  # Playing card rendering (rank + suit)
 │       └── HelpModal.tsx    # In-game help overlay
@@ -88,7 +89,7 @@ The main gameplay view — the largest and most complex page:
 - Auto-deal countdown
 - Blind level display with next-level timer
 - Pause/resume control (creator only)
-- Last hand result with winner info
+- Last hand result with winner info and separate refund display for uncalled bets
 - Showdown card reveal
 - Voluntary card showing after hands
 - Rebuy button (queues during active hand, immediate between hands)
@@ -96,6 +97,14 @@ The main gameplay view — the largest and most complex page:
 - Game over overlay with ranked standings (trophy for winner)
 - Spectator mode (hidden hole cards, no action buttons, "Watching" badge)
 - "(you)" tag on own player row
+
+### `AdminPage`
+- Password-gated admin dashboard
+- Summary cards: 24h game creation/cleanup counts, active game count
+- 30-day daily bar chart with created, completed, abandoned, never-started breakdowns
+- Active games table: game code, creator IP, creation time, player count, last activity
+- Auto-refresh every 30 seconds
+- Logout button to clear session
 
 ## Components
 
@@ -135,7 +144,8 @@ TypeScript interfaces mirroring the backend's JSON structures:
 - `EnginePlayer` — Per-player state (chips, bets, flags, actions)
 - `CardData` — Card rank + suit
 - `ValidAction` — Available actions with min/max amounts
-- `HandResult` — Winner info, pot, player hands
+- `HandResult` — Winner info, pot, player hands, refunds for uncalled bets
+- `HandResultRefund` — Uncalled bet return (player, amount)
 - `FinalStanding` — End-of-game ranking
 - `GameState`, `GameSettings`, `PlayerInfo` — Lobby types
 - `WsMessage`, `ConnectionInfo` — WebSocket message types
@@ -152,6 +162,7 @@ All CSS in a single file (1,800+ lines):
 - Hamburger menu
 - Game over standings overlay
 - Spectator badge
+- Admin dashboard styles (login form, summary cards, chart, table)
 - Lobby and form styles
 
 ## Development

@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] — 2026-02-10
+
+### Added
+- **Admin dashboard** — Password-protected admin page at `/admin` with:
+  - Summary view (24h game creation/cleanup counts, active game count)
+  - Daily stats chart (30-day bar chart with created, completed, abandoned, never-started breakdowns)
+  - Active games detail table (game code, creator IP, creation time, player count, last activity)
+  - Auto-refresh every 30 seconds
+- **Admin API endpoints** — `/api/admin/summary`, `/api/admin/daily-stats`,
+  `/api/admin/active-games` secured via `Authorization: Bearer <password>` header.
+- **Metrics system** — Redis sorted-set–based tracking for game creation,
+  completion, and cleanup events with automatic 90-day pruning.
+- **Game completion tracking** — Games marked as "ended" immediately when the
+  last opponent is eliminated (previously only updated during cleanup 24–72 h later).
+- **`ADMIN_PASSWORD` env var** — Controls admin dashboard access; added to
+  `docker-compose.yml` backend environment.
+
+### Fixed
+- **Game completion count always 0** — Completion metric was only recorded
+  during stale-game cleanup, not at the moment the game actually ended.
+- **Game status stuck on "ACTIVE"** — `_save_engine()` now detects the
+  `game_over` transition and updates lobby status to "ended" immediately.
+- **Elapsed timer kept ticking after game over** — Timer interval now stops
+  when `engine.game_over` is set.
+- **Rebuy status showed "Closed" prematurely** — Header text now uses the
+  time-based rebuy window instead of player eligibility, so it reads "Open"
+  when rebuys are still available even if no one has busted yet.
+- **Rebuy timer jumped on first bust** — Timer is now always visible when
+  rebuys are enabled (no sudden appearance/jump).
+- **Between-hands rebuy button confusing** — Shows "Cancel Rebuy" when a
+  rebuy is already queued instead of offering a duplicate "Rebuy" button.
+- **Side pot refund displayed as a "win"** — When a player's uncalled all-in
+  excess is returned (e.g., all-in for 1980 vs opponent's max 960), the hand
+  result overlay now shows "1000 returned" instead of "wins 1000 with One Pair".
+  Refunds are tracked in a separate `refunds` list in `last_hand_result`.
+
 ## [1.1.0] — 2026-02-10
 
 ### Fixed

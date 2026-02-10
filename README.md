@@ -19,6 +19,7 @@ A self-hosted, mobile-first web application for playing **No-Limit Texas Hold'em
 - **Copy join link** — One-tap share link from the lobby
 - **Last action tracking** — See each player's most recent action at the table
 - **Stale game cleanup** — Background task auto-deletes inactive games after 24 hours
+- **Admin dashboard** — Password-protected `/admin` page with game metrics, daily stats chart, and active games detail
 
 ## Tech Stack
 
@@ -85,7 +86,7 @@ source .venv/bin/activate
 python -m pytest tests/ -v
 ```
 
-The test suite (259 tests) covers cards, hand evaluation, game engine, betting actions, serialization, business logic, and API endpoints. No running Redis is required — external dependencies are mocked.
+The test suite (272 tests) covers cards, hand evaluation, game engine, betting actions, serialization, business logic, and API endpoints. No running Redis is required — external dependencies are mocked.
 
 ### Frontend
 
@@ -143,6 +144,7 @@ VITE_API_BASE=http://localhost:8000 VITE_WS_BASE=ws://localhost:8000 npm run dev
 | `JoinGamePage` | `/join/:code?` | Enter name and PIN to join |
 | `LobbyPage` | `/game/:code/lobby` | Waiting room, ready up, start game |
 | `TablePage` | `/game/:code` | Main gameplay view |
+| `AdminPage` | `/admin` | Admin dashboard (password-protected) |
 
 ## API Reference
 
@@ -173,6 +175,9 @@ VITE_API_BASE=http://localhost:8000 VITE_WS_BASE=ws://localhost:8000 npm run dev
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/admin/cleanup` | Manually trigger stale-game cleanup |
+| `GET` | `/api/admin/summary` | 24h summary metrics (requires Bearer token) |
+| `GET` | `/api/admin/daily-stats` | Daily creation/completion breakdown (requires Bearer token) |
+| `GET` | `/api/admin/active-games` | Active games detail list (requires Bearer token) |
 
 ### WebSocket
 
