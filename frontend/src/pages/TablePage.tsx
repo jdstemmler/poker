@@ -169,13 +169,13 @@ export default function TablePage() {
     };
 
     tick();
-    // Stop ticking while paused (time is frozen)
-    if (!engine.paused) {
+    // Stop ticking while paused or when game is over (time is frozen)
+    if (!engine.paused && !engine.game_over) {
       elapsedRef.current = setInterval(tick, 1000);
     }
 
     return () => clearInterval(elapsedRef.current);
-  }, [engine?.game_started_at, engine?.paused, engine?.total_paused_seconds]);
+  }, [engine?.game_started_at, engine?.paused, engine?.total_paused_seconds, engine?.game_over]);
 
   // Rebuy clock countdown
   const [rebuyTimeLeft, setRebuyTimeLeft] = useState<number | null>(null);
@@ -201,7 +201,8 @@ export default function TablePage() {
     };
 
     tick();
-    if (!engine.paused) {
+    // Stop ticking while paused or when game is over
+    if (!engine.paused && !engine.game_over) {
       rebuyRef.current = setInterval(tick, 1000);
     }
 
@@ -212,6 +213,7 @@ export default function TablePage() {
     engine?.game_started_at,
     engine?.paused,
     engine?.total_paused_seconds,
+    engine?.game_over,
   ]);
 
   // Next blind change countdown
@@ -403,7 +405,7 @@ export default function TablePage() {
             <span className="table-hand">Hand #{engine.hand_number}{elapsed ? ` · ${elapsed}` : ""}</span>
           </div>
         </div>
-        {engine.allow_rebuys && engine.players.some(p => p.can_rebuy || p.rebuy_queued) && (
+        {engine.allow_rebuys && !engine.game_over && (
           <div className="table-header-center">
             {engine.rebuy_cutoff_minutes > 0 ? (
               rebuyTimeLeft !== null && rebuyTimeLeft > 0 ? (
@@ -417,16 +419,11 @@ export default function TablePage() {
                 <span className="rebuy-status closed">Rebuy Closed</span>
               )
             ) : (
-              <span className="rebuy-status open">Rebuy Open</span>
+              <span className="rebuy-status open">Rebuys Unlimited</span>
             )}
           </div>
         )}
-        {engine.allow_rebuys && !engine.players.some(p => p.can_rebuy || p.rebuy_queued) && (
-          <div className="table-header-center">
-            <span className="rebuy-status closed">Rebuy Closed</span>
-          </div>
-        )}
-        {!engine.allow_rebuys && (
+        {!engine.allow_rebuys && !engine.game_over && (
           <div className="table-header-center">
             <span className="rebuy-status disabled">No Rebuys</span>
           </div>
@@ -694,9 +691,14 @@ export default function TablePage() {
                 {engine.paused ? "▶ Resume" : "⏸ Pause"}
               </button>
             )}
-            {me && me.chips === 0 && me.can_rebuy && (
+            {me && me.chips === 0 && me.can_rebuy && !me.rebuy_queued && (
               <button className="btn btn-rebuy" onClick={doRebuy} disabled={actionLoading}>
                 Rebuy
+              </button>
+            )}
+            {me && me.rebuy_queued && (
+              <button className="btn btn-cancel-rebuy" onClick={doCancelRebuy} disabled={actionLoading}>
+                Cancel Rebuy
               </button>
             )}
             {me && engine.my_cards.length > 0 && !engine.shown_cards?.includes(playerId!) && (
