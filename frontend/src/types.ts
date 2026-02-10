@@ -21,6 +21,7 @@ export interface GameSettings {
   turn_timeout: number;
   blind_level_duration: number;
   blind_multiplier: number;
+  auto_deal_enabled: boolean;
 }
 
 export interface GameState {

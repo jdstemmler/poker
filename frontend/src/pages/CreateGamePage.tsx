@@ -100,6 +100,7 @@ export default function CreateGamePage() {
   const [turnTimeout, setTurnTimeout] = useState(0);
   const [blindLevelDuration, setBlindLevelDuration] = useState(0);
   const [blindMultiplier, setBlindMultiplier] = useState(2.0);
+  const [autoDealEnabled, setAutoDealEnabled] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -120,6 +121,7 @@ export default function CreateGamePage() {
         turn_timeout: turnTimeout,
         blind_level_duration: blindLevelDuration,
         blind_multiplier: blindLevelDuration > 0 ? blindMultiplier : 2.0,
+        auto_deal_enabled: autoDealEnabled,
       });
       sessionStorage.setItem("playerId", res.player_id);
       sessionStorage.setItem("playerPin", pin);
@@ -215,6 +217,16 @@ export default function CreateGamePage() {
               />
             </label>
           </div>
+
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={autoDealEnabled}
+              onChange={(e) => setAutoDealEnabled(e.target.checked)}
+            />
+            Auto Deal Next Hand
+            <span className="hint">When enabled, the next hand deals automatically after 10 seconds</span>
+          </label>
 
           <label>
             Blind Level Duration (min)
@@ -326,6 +338,11 @@ export default function CreateGamePage() {
           <dd>
             Seconds each player has to act. When time runs out, the player
             auto-checks or auto-folds. Set to <strong>0</strong> for unlimited time.
+          </dd>
+          <dt>Auto Deal Next Hand</dt>
+          <dd>
+            When enabled, the next hand is dealt automatically after a 10-second
+            delay. When disabled, the host must deal each hand manually.
           </dd>
           <dt>Blind Level Duration</dt>
           <dd>

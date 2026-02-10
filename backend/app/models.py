@@ -29,7 +29,8 @@ class CreateGameRequest(BaseModel):
     rebuy_cutoff_minutes: int = Field(default=60, ge=0, le=480)  # 0 = no cutoff
     turn_timeout: int = Field(default=0, ge=0, le=300)  # seconds, 0 = no timer
     blind_level_duration: int = Field(default=0, ge=0, le=120)  # minutes, 0 = disabled
-    blind_multiplier: float = Field(default=2.0, ge=1.0, le=4.0)  # blind increase multiplier
+    blind_multiplier: float = Field(default=2.0, ge=1.0, le=4.0)
+    auto_deal_enabled: bool = True  # blind increase multiplier
 
 
 class JoinGameRequest(BaseModel):
@@ -71,6 +72,7 @@ class GameSettings(BaseModel):
     turn_timeout: int = 0  # seconds, 0 = no timer
     blind_level_duration: int = 0  # minutes, 0 = disabled
     blind_multiplier: float = 2.0  # blind increase multiplier
+    auto_deal_enabled: bool = True  # auto-deal next hand
 
 
 class GameState(BaseModel):

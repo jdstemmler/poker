@@ -135,6 +135,7 @@ export default function LobbyPage() {
           <span className="pill">🔄 Rebuys{game.settings.max_rebuys > 0 ? ` ×${game.settings.max_rebuys}` : ""}{game.settings.rebuy_cutoff_minutes > 0 ? ` (${game.settings.rebuy_cutoff_minutes}m)` : ""}</span>
         )}
         {game.settings.turn_timeout > 0 && <span className="pill">⏱ {game.settings.turn_timeout}s</span>}
+        {!game.settings.auto_deal_enabled && <span className="pill">🤚 Manual Deal</span>}
         {game.settings.blind_level_duration > 0 && <span className="pill">📈 Blinds every {game.settings.blind_level_duration}m ({game.settings.blind_multiplier}×)</span>}
       </div>
 

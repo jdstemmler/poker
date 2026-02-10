@@ -167,6 +167,7 @@ class GameEngine:
         blind_multiplier: float = 2.0,
         max_rebuys: int = 1,
         rebuy_cutoff_minutes: int = 60,
+        auto_deal_enabled: bool = True,
     ) -> None:
         self.game_code = game_code
         self.small_blind = small_blind
@@ -218,7 +219,7 @@ class GameEngine:
         self.auto_deal_deadline: Optional[float] = None  # Unix timestamp for auto-deal
 
         # Auto-deal delay in seconds (0 = disabled)
-        self.auto_deal_delay: int = 10
+        self.auto_deal_delay: int = 10 if auto_deal_enabled else 0
 
         # History
         self.hand_histories: list[HandHistory] = []

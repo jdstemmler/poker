@@ -439,6 +439,49 @@ class TestBlindSchedule:
         assert e.get_next_blind_change_at() is None
 
 
+# ── Auto-deal toggle ────────────────────────────────────────────────
+
+class TestAutoDealToggle:
+    def test_auto_deal_enabled_by_default(self):
+        e = _make_engine(3)
+        assert e.auto_deal_delay == 10
+
+    def test_auto_deal_disabled(self):
+        e = _make_engine(3, auto_deal_enabled=False)
+        assert e.auto_deal_delay == 0
+
+    def test_auto_deal_disabled_no_deadline(self):
+        """When auto-deal is disabled, no deadline should be set after hand ends."""
+        e = _make_engine(3, auto_deal_enabled=False)
+        _deal_and_get(e)
+        # End the hand by folding everyone
+        for _ in range(20):
+            if not e.hand_active:
+                break
+            pid = e.seats[e.action_on_idx].player_id
+            e.process_action(pid, "fold")
+        assert e.auto_deal_deadline is None
+
+    def test_auto_deal_enabled_sets_deadline(self):
+        """When auto-deal is enabled, a deadline should be set after hand ends."""
+        e = _make_engine(3, auto_deal_enabled=True)
+        _deal_and_get(e)
+        for _ in range(20):
+            if not e.hand_active:
+                break
+            pid = e.seats[e.action_on_idx].player_id
+            e.process_action(pid, "fold")
+        assert e.auto_deal_deadline is not None
+
+    def test_auto_deal_preserved_in_serialization(self):
+        """auto_deal_delay should survive to_dict/from_dict round-trip."""
+        e = _make_engine(3, auto_deal_enabled=False)
+        d = e.to_dict()
+        assert d["auto_deal_delay"] == 0
+        e2 = GameEngine.from_dict(d)
+        assert e2.auto_deal_delay == 0
+
+
 # ── Pause / Unpause ─────────────────────────────────────────────────
 
 class TestPause:
