@@ -356,7 +356,8 @@ export default function TablePage() {
   const canCheck = engine.valid_actions.some((a) => a.action === "check");
   const callAction = engine.valid_actions.find((a) => a.action === "call");
   const raiseAction = engine.valid_actions.find((a) => a.action === "raise");
-  const allInAction = engine.valid_actions.find((a) => a.action === "all_in");
+  // When min_amount === max_amount, the only raise option is all-in (can't meet min raise)
+  const forcedAllIn = raiseAction && raiseAction.min_amount === raiseAction.max_amount;
 
   // Raise step size — use big blind as the natural increment, minimum 5
   const raiseStep = raiseAction ? Math.max(5, engine.big_blind) : 5;
@@ -636,7 +637,7 @@ export default function TablePage() {
                       Check
                     </button>
                   )}
-                  {raiseAction && (
+                  {raiseAction && !forcedAllIn && (
                     <button
                       className={`btn btn-raise ${showRaisePanel ? "active" : ""}`}
                       onClick={() => setShowRaisePanel(!showRaisePanel)}
@@ -645,9 +646,9 @@ export default function TablePage() {
                       Raise
                     </button>
                   )}
-                  {allInAction && !raiseAction && (
-                    <button className="btn btn-allin" onClick={() => doAction("all_in")} disabled={actionLoading}>
-                      All-In {allInAction.amount}
+                  {forcedAllIn && (
+                    <button className="btn btn-allin" onClick={() => doAction("raise", raiseAction!.max_amount)} disabled={actionLoading}>
+                      All-In {raiseAction!.max_amount}
                     </button>
                   )}
                 </div>

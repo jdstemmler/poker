@@ -251,16 +251,23 @@ class GameEngine:
     ) -> list[tuple[int, int]]:
         """Build a blind schedule starting from the given initial blinds.
 
-        Generates 10 levels using the multiplier.
-        A multiplier of 2.0 doubles blinds each level; 1.5 increases 50%, etc.
+        Generates 10 levels.  When *multiplier* is 0 the schedule grows by
+        a fixed additive increment equal to the initial blinds each level
+        (e.g. 10/20 → 20/40 → 30/60 …).  Otherwise the blinds are
+        multiplied by *multiplier* each level (e.g. 2.0 doubles).
+
         Values are rounded to the nearest 5 or 10 for clean numbers.
         """
         schedule: list[tuple[int, int]] = [(start_sb, start_bb)]
         sb, bb = float(start_sb), float(start_bb)
+        additive = multiplier == 0
         for _ in range(10):
-            sb *= multiplier
-            bb *= multiplier
-            # Round to clean numbers
+            if additive:
+                sb += start_sb
+                bb += start_bb
+            else:
+                sb *= multiplier
+                bb *= multiplier
             sb_int = _round_blind(sb)
             bb_int = _round_blind(bb)
             schedule.append((sb_int, bb_int))
@@ -538,9 +545,13 @@ class GameEngine:
                 # Can only go all-in (for a call or less)
                 pass  # already covered by call
             elif max_raise_to < min_raise_to:
-                # Can only all-in for less than min raise
+                # Can't meet min raise — only all-in is possible as a raise
                 actions.append(
-                    {"action": "all_in", "amount": p.chips}
+                    {
+                        "action": "raise",
+                        "min_amount": p.chips,
+                        "max_amount": p.chips,
+                    }
                 )
             else:
                 actions.append(

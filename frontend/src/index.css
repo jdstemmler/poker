@@ -180,7 +180,8 @@ p {
   padding: 0 0.4rem;
 }
 
-label {
+label,
+.form-group {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;

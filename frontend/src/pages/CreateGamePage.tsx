@@ -93,14 +93,21 @@ function roundBlind(value: number): number {
   return Math.max(1, v);
 }
 
-/** Build a blind schedule preview (same algorithm as backend). */
+/** Build a blind schedule preview (same algorithm as backend).
+ *  multiplier=0 means additive (add initial blinds each level). */
 function buildSchedulePreview(startSb: number, startBb: number, multiplier: number): [number, number][] {
   const schedule: [number, number][] = [[startSb, startBb]];
   let sb = startSb;
   let bb = startBb;
+  const additive = multiplier === 0;
   for (let i = 0; i < 10; i++) {
-    sb *= multiplier;
-    bb *= multiplier;
+    if (additive) {
+      sb += startSb;
+      bb += startBb;
+    } else {
+      sb *= multiplier;
+      bb *= multiplier;
+    }
     schedule.push([roundBlind(sb), roundBlind(bb)]);
   }
   return schedule;
@@ -242,22 +249,22 @@ export default function CreateGamePage() {
 
           {blindLevelDuration > 0 && (
             <>
-              <label>
-                Blind Multiplier
+              <div className="form-group">
+                <span className="label-text">Blind Increase</span>
                 <div className="multiplier-options">
-                  {[1.5, 2, 3, 4].map((m) => (
+                  {[0, 1.5, 2].map((m) => (
                     <button
                       key={m}
                       type="button"
                       className={`multiplier-btn${blindMultiplier === m ? " active" : ""}`}
                       onClick={() => setBlindMultiplier(m)}
                     >
-                      {m}×
+                      {m === 0 ? "Linear" : `${m}×`}
                     </button>
                   ))}
                 </div>
-                <span className="hint">Blinds multiply by {blindMultiplier}× each level</span>
-              </label>
+                <span className="hint">{blindMultiplier === 0 ? "Blinds increase by the initial blind each level" : `Blinds multiply by ${blindMultiplier}× each level`}</span>
+              </div>
 
               <div className="blind-schedule-preview">
                 <span className="schedule-title">Blind Schedule Preview</span>
@@ -366,10 +373,11 @@ export default function CreateGamePage() {
           <dd>
             Minutes between blind increases. Set to <strong>0</strong> for fixed blinds.
           </dd>
-          <dt>Blind Multiplier</dt>
+          <dt>Blind Increase</dt>
           <dd>
-            How much the blinds multiply each level (e.g. 2× means blinds
-            double). Only applies when blind level duration is set.
+            How blinds grow each level. <strong>Linear</strong> adds the
+            initial blind each level; other options multiply. Only applies
+            when blind level duration is set.
           </dd>
         </dl>
 

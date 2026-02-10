@@ -391,13 +391,14 @@ class TestBlindSchedule:
         # 15 * 1.5 = 22.5 → round to 22 → nearest 5 = 20; 30 * 1.5 = 45
         assert e.blind_schedule[2] == (20, 45)
 
-    def test_multiplier_3x(self):
-        """3× multiplier should triple blinds each level."""
-        e = _make_engine(3, small_blind=5, big_blind=10, blind_level_duration=10, blind_multiplier=3.0)
-        assert e.blind_schedule[0] == (5, 10)
-        assert e.blind_schedule[1] == (15, 30)
-        # 15 * 3 = 45; 30 * 3 = 90
-        assert e.blind_schedule[2] == (45, 90)
+    def test_multiplier_additive_linear(self):
+        """multiplier=0 should add initial blinds each level (linear)."""
+        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=10, blind_multiplier=0)
+        assert e.blind_schedule[0] == (10, 20)
+        assert e.blind_schedule[1] == (20, 40)
+        assert e.blind_schedule[2] == (30, 60)
+        assert e.blind_schedule[3] == (40, 80)
+        assert e.blind_schedule[10] == (110, 220)
 
     def test_multiplier_preserved_in_serialization(self):
         """blind_multiplier should survive to_dict/from_dict round-trip."""

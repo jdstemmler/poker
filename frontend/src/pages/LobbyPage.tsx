@@ -136,7 +136,7 @@ export default function LobbyPage() {
         )}
         {game.settings.turn_timeout > 0 && <span className="pill">⏱ {game.settings.turn_timeout}s</span>}
         {!game.settings.auto_deal_enabled && <span className="pill">🤚 Manual Deal</span>}
-        {game.settings.blind_level_duration > 0 && <span className="pill">📈 Blinds every {game.settings.blind_level_duration}m ({game.settings.blind_multiplier}×)</span>}
+        {game.settings.blind_level_duration > 0 && <span className="pill">📈 Blinds every {game.settings.blind_level_duration}m ({game.settings.blind_multiplier === 0 ? "Linear" : `${game.settings.blind_multiplier}×`})</span>}
       </div>
 
       <div className="player-list">

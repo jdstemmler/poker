@@ -192,6 +192,60 @@ class TestAllIn:
         e.process_action(pid, "all_in")
         assert e.pot == pot_before + chips
 
+    def test_short_all_in_returns_raise_not_all_in(self):
+        """When a player can't meet min raise, get_valid_actions should still
+        return 'raise' (with min == max) instead of 'all_in'."""
+        e = _make_engine(3, starting_chips=5000, small_blind=10, big_blind=20)
+        e.start_new_hand()
+
+        utg_idx = e.action_on_idx
+        utg = e.seats[utg_idx]
+        next_idx = (utg_idx + 1) % 3
+        # Give UTG a big stack, next player a smaller one
+        utg.chips = 3000
+        e.seats[next_idx].chips = 2000
+
+        # UTG makes a big raise — min re-raise will exceed next player's stack
+        e.process_action(utg.player_id, "raise", 1500)
+
+        next_pid = e.seats[next_idx].player_id
+        actions = e.get_valid_actions(next_pid)
+        action_names = [a["action"] for a in actions]
+
+        # Should never see 'all_in' as a valid action
+        assert "all_in" not in action_names
+        # Should see raise with min == max (forced all-in)
+        raise_action = next(a for a in actions if a["action"] == "raise")
+        assert raise_action["min_amount"] == raise_action["max_amount"]
+        assert raise_action["max_amount"] == e.seats[next_idx].chips
+
+    def test_normal_raise_returns_range(self):
+        """When a player CAN meet min raise, raise should have min < max."""
+        e = _make_engine(3, starting_chips=5000, small_blind=10, big_blind=20)
+        e.start_new_hand()
+        actions = e.get_valid_actions(_action_pid(e))
+        raise_action = next(a for a in actions if a["action"] == "raise")
+        assert raise_action["min_amount"] < raise_action["max_amount"]
+
+    def test_forced_all_in_accepted_as_raise(self):
+        """A player in the forced all-in case can submit a 'raise' action
+        for their full stack and it succeeds."""
+        e = _make_engine(3, starting_chips=5000, small_blind=10, big_blind=20)
+        e.start_new_hand()
+
+        utg_idx = e.action_on_idx
+        utg = e.seats[utg_idx]
+        next_idx = (utg_idx + 1) % 3
+        utg.chips = 3000
+        e.seats[next_idx].chips = 2000
+
+        e.process_action(utg.player_id, "raise", 1500)
+        p_next = e.seats[next_idx]
+        chips_before = p_next.chips
+        e.process_action(p_next.player_id, "raise", chips_before)
+        assert p_next.chips == 0
+        assert p_next.all_in
+
 
 # ── Round advancement ────────────────────────────────────────────────
 
