@@ -269,8 +269,24 @@ async def _load_engine(code: str) -> GameEngine:
 
 
 async def _save_engine(code: str, engine: GameEngine) -> None:
-    """Persist game engine to Redis."""
+    """Persist game engine to Redis.
+
+    If the engine has transitioned to game_over, also update the lobby-level
+    game status to 'ended' and record a completion metric (once).
+    """
     await redis_client.store_engine(code, engine.to_dict())
+
+    if engine.game_over:
+        game_data = await redis_client.load_game(code)
+        if game_data and game_data.get("status") != GameStatus.ENDED.value:
+            game_data["status"] = GameStatus.ENDED.value
+            await redis_client.store_game(code, game_data)
+            players = await redis_client.load_all_players(code)
+            await metrics.record_game_completed(
+                code=code,
+                player_count=len(players),
+                hand_count=engine.hand_number,
+            )
 
 
 async def verify_player(code: str, player_id: str, pin: str) -> None:

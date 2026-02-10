@@ -19,7 +19,7 @@ interface CompletionStats {
   completed: number;
   abandoned: number;
   never_started: number;
-  total_cleaned: number;
+  total: number;
 }
 
 interface DailyStats {
