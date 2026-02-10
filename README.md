@@ -9,7 +9,7 @@ A self-hosted, mobile-first web application for playing **No-Limit Texas Hold'em
 - **Real-time updates** — WebSocket-driven state sync with automatic reconnection
 - **Turn timer** — Optional configurable countdown with auto-fold/auto-check
 - **Auto-deal** — Automatic dealing after a configurable delay between hands
-- **Blind schedule** — Configurable escalating blind levels on a timed schedule
+- **Blind schedule** — Configurable escalating blind levels (Linear, 1.5×, or 2× increase) with schedule preview
 - **Pause / Unpause** — Creator can pause the game (freezes timers and blind clock)
 - **Mobile-first UI** — Dark theme, touch-optimized action buttons, responsive layout
 - **Voluntary card reveal** — Cards hidden by default after each hand; players choose whether to show
@@ -85,7 +85,7 @@ source .venv/bin/activate
 python -m pytest tests/ -v
 ```
 
-The test suite (237 tests) covers cards, hand evaluation, game engine, betting actions, serialization, business logic, and API endpoints. No running Redis is required — external dependencies are mocked.
+The test suite (259 tests) covers cards, hand evaluation, game engine, betting actions, serialization, business logic, and API endpoints. No running Redis is required — external dependencies are mocked.
 
 ### Frontend
 
@@ -182,16 +182,15 @@ VITE_API_BASE=http://localhost:8000 VITE_WS_BASE=ws://localhost:8000 npm run dev
 
 ## Game Flow
 
-1. **Create** a game — configure blinds, starting chips, timer, max players
+1. **Create** a game — configure blinds, starting chips, timer, and rebuys
 2. **Share** the 6-character room code with friends
 3. **Join** — each player enters their name and a 4-digit PIN
-4. **Ready up** — everyone toggles ready in the lobby
-5. **Start** — creator starts the game, first hand is dealt automatically
-6. **Play** — standard No-Limit Hold'em: preflop → flop → turn → river → showdown
-7. **Between hands** — cards are hidden; players may click "Show Cards" to reveal
-8. **Next hand** — any player clicks "Deal Next Hand" to continue (or auto-deal fires)
-9. **Rebuy** — busted players can rebuy back to starting chips (if enabled)
-10. **Pause** — creator can pause the game to freeze timers and the blind clock
+4. **Start** — creator starts the game from the lobby, first hand is dealt automatically
+5. **Play** — standard No-Limit Hold'em: preflop → flop → turn → river → showdown
+6. **Between hands** — cards are hidden; players may click "Show Cards" to reveal
+7. **Next hand** — auto-deal fires after a countdown, or any player clicks "Deal Next Hand"
+8. **Rebuy** — busted players can rebuy back to starting chips (if enabled)
+9. **Pause** — creator can pause the game to freeze timers and the blind clock
 
 ## Configuration
 
@@ -202,12 +201,13 @@ Game settings are configured at creation time:
 | Starting Chips | 1000 | 100–100,000 | Chips each player starts with |
 | Small Blind | 10 | 1+ | Small blind amount |
 | Big Blind | 20 | 2+ | Big blind amount |
-| Max Players | 9 | 4–9 | Maximum seats at the table |
 | Allow Rebuys | Yes | — | Whether busted players can rebuy |
 | Max Rebuys | 1 | 0–99 | Rebuys per player (0 = unlimited) |
 | Rebuy Cutoff | 60 min | 0–480 | Time window for rebuys (0 = no cutoff) |
 | Turn Timeout | 0 (off) | 0–300 | Seconds per turn (0 = unlimited) |
+| Auto-Deal | Yes | — | Automatically deal next hand after a countdown |
 | Blind Level Duration | 0 (off) | 0–120 | Minutes per blind level (0 = fixed blinds) |
+| Blind Increase | 2× | Linear / 1.5× / 2× | How blinds grow each level (Linear adds initial blinds) |
 
 ## License
 
