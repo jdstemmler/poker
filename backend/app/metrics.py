@@ -54,12 +54,35 @@ async def record_game_cleaned(
     await r.zadd(METRICS_CLEANED_KEY, {entry: now})
 
 
+METRICS_COMPLETED_KEY = "metrics:game_completed"
+
+
+async def record_game_completed(
+    code: str,
+    player_count: int,
+    hand_count: int,
+) -> None:
+    """Record that a game was played to completion (a winner was determined)."""
+    r = await redis_client.get_redis()
+    now = time.time()
+    entry = json.dumps(
+        {
+            "code": code,
+            "completed_at": now,
+            "player_count": player_count,
+            "hand_count": hand_count,
+        }
+    )
+    await r.zadd(METRICS_COMPLETED_KEY, {entry: now})
+
+
 async def prune_old_metrics() -> None:
     """Remove metric entries older than METRICS_RETENTION_DAYS."""
     r = await redis_client.get_redis()
     cutoff = time.time() - (METRICS_RETENTION_DAYS * 86400)
     await r.zremrangebyscore(METRICS_CREATED_KEY, "-inf", cutoff)
     await r.zremrangebyscore(METRICS_CLEANED_KEY, "-inf", cutoff)
+    await r.zremrangebyscore(METRICS_COMPLETED_KEY, "-inf", cutoff)
 
 
 # ------------------------------------------------------------------
@@ -118,17 +141,19 @@ async def get_daily_stats(days: int = 30) -> dict[str, Any]:
 
     daily_creation = [{"date": k, "count": v} for k, v in daily.items()]
 
-    # Completion breakdown
-    completed = 0
+    # --- completed entries (recorded immediately at game-over) ---
+    completed_raw = await r.zrangebyscore(METRICS_COMPLETED_KEY, since, "+inf")
+    completed = len(completed_raw)
+
+    # Completion breakdown from cleanup events (abandoned / never started)
     abandoned = 0
     never_started = 0
     for entry in cleaned_entries:
         if entry.get("final_status") == "lobby":
             never_started += 1
-        elif entry.get("was_completed"):
-            completed += 1
-        else:
+        elif not entry.get("was_completed"):
             abandoned += 1
+        # was_completed cleanup entries are already counted via METRICS_COMPLETED_KEY
 
     return {
         "daily_creation": daily_creation,
@@ -136,7 +161,7 @@ async def get_daily_stats(days: int = 30) -> dict[str, Any]:
             "completed": completed,
             "abandoned": abandoned,
             "never_started": never_started,
-            "total_cleaned": completed + abandoned + never_started,
+            "total": completed + abandoned + never_started,
         },
     }
 
@@ -159,10 +184,17 @@ async def get_active_games_detail() -> list[dict[str, Any]]:
         players = await redis_client.load_all_players(code)
         last_activity = await redis_client.get_last_activity(code)
 
+        # Use lobby-level status, but also check engine for game_over
+        status = game_data.get("status", "unknown")
+        if status == "active":
+            engine_data = await redis_client.load_engine(code)
+            if engine_data and engine_data.get("game_over"):
+                status = "ended"
+
         games.append(
             {
                 "code": code,
-                "status": game_data.get("status", "unknown"),
+                "status": status,
                 "creator_ip": game_data.get("creator_ip", "unknown"),
                 "created_at": game_data.get("created_at"),
                 "player_count": len(players),
