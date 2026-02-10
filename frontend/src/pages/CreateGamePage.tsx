@@ -1,28 +1,42 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createGame } from "../api";
 import HelpModal from "../components/HelpModal";
 
-/** Numeric input that avoids leading zeros and selects all on focus. */
+/** Numeric input that avoids leading zeros and selects all on focus.
+ *  When `emptyValue` is provided and the value equals it, the field
+ *  renders empty so the placeholder is visible — no need to delete first. */
 function NumericInput({
   value,
   onChange,
   placeholder,
+  emptyValue,
   ...rest
 }: {
   value: number;
   onChange: (v: number) => void;
   placeholder?: string;
+  emptyValue?: number;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "placeholder">) {
-  const [display, setDisplay] = useState(String(value));
+  const shouldBeEmpty = emptyValue !== undefined && value === emptyValue;
+  const [display, setDisplay] = useState(shouldBeEmpty ? "" : String(value));
+  const [focused, setFocused] = useState(false);
+
+  // Sync display when value changes externally (not while user is typing)
+  useEffect(() => {
+    if (!focused) {
+      const empty = emptyValue !== undefined && value === emptyValue;
+      setDisplay(empty ? "" : String(value));
+    }
+  }, [value, emptyValue, focused]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
-      // Allow empty field (will parse as 0 / use placeholder default)
+      // Allow empty field
       if (raw === "" || raw === "-") {
         setDisplay(raw);
-        onChange(0);
+        onChange(emptyValue ?? 0);
         return;
       }
       const n = Number(raw);
@@ -31,17 +45,23 @@ function NumericInput({
         onChange(n);
       }
     },
-    [onChange],
+    [onChange, emptyValue],
   );
 
   const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.select();
+    setFocused(true);
+    // Delay select to work around browsers that clear selection after focus
+    const input = e.target;
+    requestAnimationFrame(() => {
+      if (input.value) input.select();
+    });
   }, []);
 
   const handleBlur = useCallback(() => {
-    // On blur, show the current numeric value (no empty fields)
-    setDisplay(String(value));
-  }, [value]);
+    setFocused(false);
+    const empty = emptyValue !== undefined && value === emptyValue;
+    setDisplay(empty ? "" : String(value));
+  }, [value, emptyValue]);
 
   return (
     <input
@@ -213,6 +233,7 @@ export default function CreateGamePage() {
               value={blindLevelDuration}
               onChange={setBlindLevelDuration}
               placeholder="0 = no increases"
+              emptyValue={0}
             />
             {blindLevelDuration > 0 && (
               <span className="hint">Blinds increase every {blindLevelDuration} min</span>
@@ -261,6 +282,7 @@ export default function CreateGamePage() {
               value={turnTimeout}
               onChange={setTurnTimeout}
               placeholder="0 = off"
+              emptyValue={0}
             />
           </label>
 
@@ -294,6 +316,7 @@ export default function CreateGamePage() {
                   value={maxRebuys}
                   onChange={setMaxRebuys}
                   placeholder="0 = unlimited"
+                  emptyValue={0}
                 />
                 <span className="hint">{maxRebuys === 0 ? "Unlimited" : `${maxRebuys} allowed`}</span>
               </label>
@@ -303,6 +326,7 @@ export default function CreateGamePage() {
                   value={rebuyCutoffMinutes}
                   onChange={setRebuyCutoffMinutes}
                   placeholder="0 = no cutoff"
+                  emptyValue={0}
                 />
                 <span className="hint">{rebuyCutoffMinutes === 0 ? "No cutoff" : `${rebuyCutoffMinutes} min`}</span>
               </label>

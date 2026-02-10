@@ -36,6 +36,8 @@ export function createGame(data: {
   rebuy_cutoff_minutes?: number;
   turn_timeout?: number;
   blind_level_duration?: number;
+  blind_multiplier?: number;
+  auto_deal_enabled?: boolean;
 }): Promise<CreateGameResponse> {
   return request("/api/games", {
     method: "POST",
