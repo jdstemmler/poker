@@ -615,38 +615,45 @@ export default function TablePage() {
           <div className="action-bar">
             {isMyTurn ? (
               <>
-                {canFold && (
-                  <button className="btn btn-fold" onClick={() => doAction("fold")} disabled={actionLoading}>
-                    Fold
-                  </button>
-                )}
-                {canCheck && (
-                  <button className="btn btn-check" onClick={() => doAction("check")} disabled={actionLoading}>
-                    Check
-                  </button>
-                )}
+                {/* Call button as a prominent full-width row above other actions */}
                 {callAction && (
-                  <button className="btn btn-call" onClick={() => doAction("call")} disabled={actionLoading}>
+                  <button
+                    className="btn btn-call btn-call-prominent"
+                    onClick={() => doAction("call")}
+                    disabled={actionLoading}
+                  >
                     Call {callAction.amount}
                   </button>
                 )}
-                {raiseAction && (
-                  <button
-                    className={`btn btn-raise ${showRaisePanel ? "active" : ""}`}
-                    onClick={() => setShowRaisePanel(!showRaisePanel)}
-                    disabled={actionLoading}
-                  >
-                    Raise
-                  </button>
-                )}
-                {allInAction && !raiseAction && (
-                  <button className="btn btn-allin" onClick={() => doAction("all_in")} disabled={actionLoading}>
-                    All-In {allInAction.amount}
-                  </button>
-                )}
+                <div className="action-row">
+                  {canFold && (
+                    <button className="btn btn-fold" onClick={() => doAction("fold")} disabled={actionLoading}>
+                      Fold
+                    </button>
+                  )}
+                  {canCheck && (
+                    <button className="btn btn-check" onClick={() => doAction("check")} disabled={actionLoading}>
+                      Check
+                    </button>
+                  )}
+                  {raiseAction && (
+                    <button
+                      className={`btn btn-raise ${showRaisePanel ? "active" : ""}`}
+                      onClick={() => setShowRaisePanel(!showRaisePanel)}
+                      disabled={actionLoading}
+                    >
+                      Raise
+                    </button>
+                  )}
+                  {allInAction && !raiseAction && (
+                    <button className="btn btn-allin" onClick={() => doAction("all_in")} disabled={actionLoading}>
+                      All-In {allInAction.amount}
+                    </button>
+                  )}
+                </div>
               </>
             ) : (
-              <>
+              <div className="action-row">
                 <button
                   className={`btn ${preFold ? "btn-prefold-active" : "btn-prefold"}`}
                   onClick={() => setPreFold(!preFold)}
@@ -655,7 +662,7 @@ export default function TablePage() {
                 </button>
                 <button className="btn btn-check" disabled>Check</button>
                 <button className="btn btn-raise" disabled>Raise</button>
-              </>
+              </div>
             )}
           </div>
         )}

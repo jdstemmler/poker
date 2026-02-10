@@ -1480,10 +1480,16 @@ input::placeholder {
 /* Action Bar */
 .action-bar {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
   -webkit-transform: translate3d(0, 0, 0);
   transform: translate3d(0, 0, 0);
   will-change: contents;
+}
+
+.action-row {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .action-bar .btn {
@@ -1498,6 +1504,14 @@ input::placeholder {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   will-change: background-color;
+}
+
+/* Prominent call button — full-width row above fold/raise */
+.btn-call-prominent {
+  width: 100%;
+  font-size: 1rem !important;
+  padding: 0.85rem 0.5rem !important;
+  letter-spacing: 0.03em;
 }
 
 .btn-fold {
