@@ -477,8 +477,8 @@ class GameEngine:
             or self.game_started_at is None
         ):
             return None
-        if self.paused:
-            return None  # don't show countdown while paused
+        if self.game_over:
+            return None  # don't show countdown when game is over
         next_level = self.blind_level + 1
         return self.game_started_at + self.total_paused_seconds + (next_level * self.blind_level_duration * 60)
 

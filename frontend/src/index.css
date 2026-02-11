@@ -928,6 +928,8 @@ input::placeholder {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .table-header-info {
@@ -1005,12 +1007,16 @@ input::placeholder {
 .table-hand {
   font-size: 0.7rem;
   color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
 }
 
 .table-header-right {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-end;
 }
 
 /* Rebuy Status Indicator (center of header) */
@@ -1019,6 +1025,7 @@ input::placeholder {
   flex-direction: column;
   align-items: center;
   gap: 0.1rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .rebuy-status {
@@ -1050,6 +1057,7 @@ input::placeholder {
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .table-blinds-info {
@@ -1057,6 +1065,7 @@ input::placeholder {
   flex-direction: column;
   align-items: flex-end;
   gap: 0.05rem;
+  min-width: 3.5rem;
 }
 
 .blinds-value {
@@ -1064,11 +1073,13 @@ input::placeholder {
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--gold);
+  font-variant-numeric: tabular-nums;
 }
 
 .blinds-next {
   font-size: 0.6rem;
   color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
 }
 
 .spectator-badge {

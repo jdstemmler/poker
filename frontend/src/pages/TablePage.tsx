@@ -223,7 +223,7 @@ export default function TablePage() {
   useEffect(() => {
     clearInterval(blindRef.current);
 
-    if (!engine?.next_blind_change_at) {
+    if (!engine?.next_blind_change_at || engine?.game_over) {
       setBlindCountdown("");
       return;
     }
@@ -236,10 +236,13 @@ export default function TablePage() {
     };
 
     tick();
-    blindRef.current = setInterval(tick, 1000);
+    // Stop ticking while paused (timer stays visible but frozen)
+    if (!engine.paused) {
+      blindRef.current = setInterval(tick, 1000);
+    }
 
     return () => clearInterval(blindRef.current);
-  }, [engine?.next_blind_change_at]);
+  }, [engine?.next_blind_change_at, engine?.game_over, engine?.paused]);
 
   if (notAuthenticated) {
     return (
@@ -431,7 +434,15 @@ export default function TablePage() {
         <div className="table-header-right">
           <div className="table-blinds-info">
             <span className="blinds-value">{engine.small_blind}/{engine.big_blind}</span>
-            {blindCountdown && <span className="blinds-next">Next: {blindCountdown}</span>}
+            {blindCountdown && (() => {
+              const nextLevel = engine.blind_schedule?.[engine.blind_level + 1];
+              const nextBlinds = nextLevel ? `${nextLevel[0]}/${nextLevel[1]}` : "";
+              return (
+                <span className="blinds-next">
+                  {nextBlinds ? `${nextBlinds} in ` : "Next: "}{blindCountdown}
+                </span>
+              );
+            })()}
           </div>
           {connInfo && connInfo.spectator_count > 0 && (
             <span className="spectator-badge">👁 {connInfo.spectator_count}</span>
