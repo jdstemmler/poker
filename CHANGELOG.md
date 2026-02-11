@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] — 2026-02-11
+
+### Security
+- **Timing-safe admin password check** — Admin endpoint authentication now uses
+  `hmac.compare_digest()` instead of direct string comparison to prevent timing
+  attacks against the admin password.
+- **Rate limiting** — All REST endpoints are now rate-limited via `slowapi`.
+  Create/start: 5/min, join/leave/rebuy/pause/admin: 10/min, game actions/deal:
+  30/min. Returns HTTP 429 when exceeded. Configurable via `RATE_LIMIT_ENABLED`
+  env var (set to `0` to disable).
+
+### Fixed
+- **Race conditions in game engine operations** — Added per-game `asyncio.Lock`
+  to all engine load-modify-save operations in `game_manager.py` and `timer.py`,
+  preventing concurrent requests from corrupting game state.
+- **Timer paths missing game-over detection** — Auto-fold and auto-deal timer
+  handlers now use `_save_engine()` (which checks for game-over transitions)
+  instead of writing raw engine data directly to Redis. Games that end via
+  timeout are now properly marked as "ended."
+- **Rebuy cutoff ignoring pause time** — Rebuy time window now uses
+  `_effective_elapsed()` (which excludes paused time) instead of raw wall-clock
+  time. Pausing no longer eats into the rebuy window.
+- **Silent exception swallowing** — All bare `except Exception: pass` blocks
+  replaced with `logger.debug(...)` or `logger.warning(...)` calls for proper
+  observability. Expected failures (disconnected WebSocket clients) log at debug
+  level; unexpected failures log at warning level with full tracebacks.
+
+### Added
+- **`slowapi` dependency** — Added to `backend/requirements.txt` for rate limiting.
+- **`RATE_LIMIT_ENABLED` env var** — Set to `0` to disable rate limiting
+  (useful for testing and development).
+
 ## [1.3.0] — 2026-02-10
 
 ### Changed

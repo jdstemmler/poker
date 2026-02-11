@@ -1,8 +1,8 @@
 """FastAPI application — REST + WebSocket endpoints for poker."""
 
-from __future__ import annotations
-
+import hmac
 import json
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -16,7 +16,11 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app import game_manager, metrics, redis_client
 from app.models import (
@@ -31,6 +35,8 @@ from app.models import (
 from app.ws_manager import ClientRole, manager
 from app.timer import action_timer
 from app.cleanup import game_cleaner, cleanup_stale_games
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -47,6 +53,25 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Poker Game API", lifespan=lifespan)
+
+# ---------- Rate Limiting ----------
+
+_rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "1") != "0"
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    enabled=_rate_limit_enabled,
+)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Please slow down."},
+    )
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -68,7 +93,8 @@ async def verify_admin(authorization: str | None = Header(None)):
             status_code=503,
             detail="Admin not configured. Set ADMIN_PASSWORD env var.",
         )
-    if not authorization or authorization != f"Bearer {ADMIN_PASSWORD}":
+    expected = f"Bearer {ADMIN_PASSWORD}"
+    if not authorization or not hmac.compare_digest(authorization, expected):
         raise HTTPException(status_code=401, detail="Invalid admin password")
 
 
@@ -76,7 +102,8 @@ async def verify_admin(authorization: str | None = Header(None)):
 
 
 @app.post("/api/games", response_model=CreateGameResponse)
-async def create_game(req: CreateGameRequest, request: Request):
+@limiter.limit("5/minute")
+async def create_game(request: Request, req: CreateGameRequest):
     forwarded = request.headers.get("x-forwarded-for", "")
     if forwarded:
         creator_ip = forwarded.split(",")[0].strip()
@@ -89,7 +116,8 @@ async def create_game(req: CreateGameRequest, request: Request):
 
 
 @app.post("/api/games/{code}/join", response_model=JoinGameResponse)
-async def join_game(code: str, req: JoinGameRequest):
+@limiter.limit("10/minute")
+async def join_game(request: Request, code: str, req: JoinGameRequest):
     try:
         player_id, state = await game_manager.join_game(code.upper(), req)
     except ValueError as e:
@@ -100,7 +128,8 @@ async def join_game(code: str, req: JoinGameRequest):
 
 
 @app.get("/api/games/{code}")
-async def get_game(code: str):
+@limiter.limit("30/minute")
+async def get_game(request: Request, code: str):
     state = await game_manager.get_game_state(code.upper())
     if state is None:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -108,7 +137,8 @@ async def get_game(code: str):
 
 
 @app.post("/api/games/{code}/ready")
-async def toggle_ready(code: str, req: ReadyRequest):
+@limiter.limit("10/minute")
+async def toggle_ready(request: Request, code: str, req: ReadyRequest):
     try:
         state = await game_manager.toggle_ready(code.upper(), req.player_id, req.pin)
     except ValueError as e:
@@ -125,7 +155,8 @@ class LeaveRequest(BaseModel):
 
 
 @app.post("/api/games/{code}/leave")
-async def leave_game(code: str, req: LeaveRequest):
+@limiter.limit("10/minute")
+async def leave_game(request: Request, code: str, req: LeaveRequest):
     """Leave the lobby (non-creator only, before game starts)."""
     try:
         state = await game_manager.leave_game(code.upper(), req.player_id, req.pin)
@@ -137,7 +168,8 @@ async def leave_game(code: str, req: LeaveRequest):
 
 
 @app.post("/api/games/{code}/start")
-async def start_game(code: str, req: StartGameRequest):
+@limiter.limit("5/minute")
+async def start_game(request: Request, code: str, req: StartGameRequest):
     try:
         state = await game_manager.start_game(code.upper(), req.player_id, req.pin)
     except ValueError as e:
@@ -171,7 +203,8 @@ class RebuyRequest(BaseModel):
 
 
 @app.get("/api/games/{code}/state/{player_id}")
-async def get_engine_state(code: str, player_id: str):
+@limiter.limit("30/minute")
+async def get_engine_state(request: Request, code: str, player_id: str):
     """Get the game engine state for a specific player (their view)."""
     try:
         return await game_manager.get_engine_state(code.upper(), player_id)
@@ -180,7 +213,8 @@ async def get_engine_state(code: str, player_id: str):
 
 
 @app.post("/api/games/{code}/action")
-async def game_action(code: str, req: GameActionRequest):
+@limiter.limit("30/minute")
+async def game_action(request: Request, code: str, req: GameActionRequest):
     """Process a player's game action (fold, check, call, raise, all_in)."""
     try:
         result = await game_manager.process_action(
@@ -196,7 +230,8 @@ async def game_action(code: str, req: GameActionRequest):
 
 
 @app.post("/api/games/{code}/deal")
-async def deal_next_hand(code: str, req: DealHandRequest):
+@limiter.limit("30/minute")
+async def deal_next_hand(request: Request, code: str, req: DealHandRequest):
     """Deal the next hand (any player can trigger)."""
     try:
         result = await game_manager.deal_next_hand(
@@ -211,7 +246,8 @@ async def deal_next_hand(code: str, req: DealHandRequest):
 
 
 @app.post("/api/games/{code}/rebuy")
-async def rebuy(code: str, req: RebuyRequest):
+@limiter.limit("10/minute")
+async def rebuy(request: Request, code: str, req: RebuyRequest):
     """Request a rebuy."""
     try:
         result = await game_manager.request_rebuy(
@@ -225,7 +261,8 @@ async def rebuy(code: str, req: RebuyRequest):
 
 
 @app.post("/api/games/{code}/cancel_rebuy")
-async def cancel_rebuy(code: str, req: RebuyRequest):
+@limiter.limit("10/minute")
+async def cancel_rebuy(request: Request, code: str, req: RebuyRequest):
     """Cancel a queued rebuy."""
     try:
         result = await game_manager.cancel_rebuy(
@@ -244,7 +281,8 @@ class ShowCardsRequest(BaseModel):
 
 
 @app.post("/api/games/{code}/show_cards")
-async def show_cards(code: str, req: ShowCardsRequest):
+@limiter.limit("10/minute")
+async def show_cards(request: Request, code: str, req: ShowCardsRequest):
     """Voluntarily reveal cards after a hand."""
     try:
         result = await game_manager.show_cards(
@@ -263,7 +301,8 @@ class PauseRequest(BaseModel):
 
 
 @app.post("/api/games/{code}/pause")
-async def toggle_pause(code: str, req: PauseRequest):
+@limiter.limit("10/minute")
+async def toggle_pause(request: Request, code: str, req: PauseRequest):
     """Toggle pause state (creator only)."""
     try:
         result = await game_manager.toggle_pause(
@@ -278,26 +317,30 @@ async def toggle_pause(code: str, req: PauseRequest):
 
 
 @app.post("/api/admin/cleanup")
-async def admin_cleanup(_=Depends(verify_admin)):
+@limiter.limit("10/minute")
+async def admin_cleanup(request: Request, _=Depends(verify_admin)):
     """Manually trigger stale-game cleanup. Returns deleted and kept game codes."""
     result = await cleanup_stale_games()
     return result
 
 
 @app.get("/api/admin/summary")
-async def admin_summary(_=Depends(verify_admin)):
+@limiter.limit("10/minute")
+async def admin_summary(request: Request, _=Depends(verify_admin)):
     """Summary stats: games created/cleaned in last 24 h, active count."""
     return await metrics.get_summary()
 
 
 @app.get("/api/admin/daily-stats")
-async def admin_daily_stats(_=Depends(verify_admin)):
+@limiter.limit("10/minute")
+async def admin_daily_stats(request: Request, _=Depends(verify_admin)):
     """Daily creation counts + completion/abandonment breakdown (30 days)."""
     return await metrics.get_daily_stats()
 
 
 @app.get("/api/admin/active-games")
-async def admin_active_games(_=Depends(verify_admin)):
+@limiter.limit("10/minute")
+async def admin_active_games(request: Request, _=Depends(verify_admin)):
     """Detailed list of all active games. No card data."""
     games = await metrics.get_active_games_detail()
     return {"games": games}
@@ -346,7 +389,7 @@ async def websocket_endpoint(ws: WebSocket, code: str, player_id: str):
         # Broadcast connection info to all
         await _broadcast_connection_info(code)
     except Exception:
-        pass
+        logger.debug("Error sending initial state to %s in %s", player_id, code, exc_info=True)
 
     try:
         while True:
@@ -377,7 +420,7 @@ async def websocket_endpoint(ws: WebSocket, code: str, player_id: str):
                 await _broadcast(code, fresh_state)
             await _broadcast_connection_info(code)
         except Exception:
-            pass
+            logger.debug("Error broadcasting disconnect for %s in %s", player_id, code, exc_info=True)
 
 
 # ---------- Helpers ----------
@@ -397,7 +440,7 @@ async def _broadcast_engine_state(code: str) -> None:
             msg = json.dumps({"type": "game_state", "data": view})
             await manager.send_to_player(code, pid, msg)
         except Exception:
-            pass  # player may have disconnected
+            logger.debug("Failed to send engine state to %s in %s", pid, code, exc_info=True)
 
     # Also send a spectator-safe view to spectators (no hole cards)
     try:
@@ -415,7 +458,7 @@ async def _broadcast_engine_state(code: str) -> None:
                 for conn in list(manager._spectators.get(code, [])):
                     await conn.send(spec_msg)
     except Exception:
-        pass
+        logger.debug("Failed to send spectator state for %s", code, exc_info=True)
 
 
 async def _broadcast_connection_info(code: str) -> None:
@@ -439,4 +482,4 @@ async def _sync_timer(code: str) -> None:
         else:
             action_timer.clear_auto_deal(code)
     except Exception:
-        pass
+        logger.warning("Failed to sync timer for game %s", code, exc_info=True)

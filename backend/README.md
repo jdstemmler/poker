@@ -11,6 +11,7 @@ Python/FastAPI backend that runs the authoritative No-Limit Texas Hold'em game e
 | Uvicorn | 0.34.0 |
 | Redis (async, hiredis) | 5.2.1 |
 | Pydantic | 2.10.4 |
+| slowapi | 0.1.9 |
 | pytest | 9.0.2 |
 
 ## Project Structure
@@ -31,7 +32,7 @@ backend/
 │   ├── models.py          # Pydantic request/response models
 │   └── redis_client.py    # Async Redis persistence layer
 ├── tests/
-│   ├── test_engine.py     # Engine tests (272 tests total across all files)
+│   ├── test_engine.py     # Engine tests (283 tests total across all files)
 │   ├── test_actions.py    # Betting action tests
 │   ├── test_api.py        # HTTP endpoint tests
 │   ├── test_cards.py      # Card/Deck tests
@@ -91,6 +92,7 @@ Sits between the HTTP routes and the engine, handling:
 - Ready toggling and game start authorization (creator only)
 - Action dispatch with PIN re-verification
 - Engine state retrieval with per-player view filtering
+- Per-game `asyncio.Lock` to prevent concurrent engine mutations
 
 ### `main.py` — FastAPI Application
 
@@ -101,6 +103,7 @@ REST endpoints and WebSocket handling:
 - **WebSocket** — Per-player connections with automatic state broadcasting
 - **Spectator support** — Unknown player IDs connect as spectators (no hole cards)
 - **Broadcasting** — State changes push to all connected players/spectators
+- **Rate limiting** — Per-IP rate limits via slowapi (configurable via `RATE_LIMIT_ENABLED`)
 - **Background tasks** — Action timer and stale game cleanup start on app lifespan
 
 ### `ws_manager.py` — WebSocket Manager
@@ -255,3 +258,4 @@ Messages are JSON with a `type` field:
 |----------|---------|-------------|
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection URL |
 | `ADMIN_PASSWORD` | _(none)_ | Password for admin dashboard access (Bearer token) |
+| `RATE_LIMIT_ENABLED` | `1` | Set to `0` to disable API rate limiting |

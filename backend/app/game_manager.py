@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import random
 import string
@@ -19,6 +20,16 @@ from app.models import (
     JoinGameRequest,
     PlayerInfo,
 )
+
+
+_game_locks: dict[str, asyncio.Lock] = {}
+
+
+def _get_lock(code: str) -> asyncio.Lock:
+    """Return (or create) the asyncio.Lock for a given game code."""
+    if code not in _game_locks:
+        _game_locks[code] = asyncio.Lock()
+    return _game_locks[code]
 
 
 def _generate_code(length: int = 6) -> str:
@@ -306,9 +317,10 @@ async def process_action(
     """Process a player's game action."""
     await verify_player(code, player_id, pin)
 
-    engine = await _load_engine(code)
-    result = engine.process_action(player_id, action, amount)
-    await _save_engine(code, engine)
+    async with _get_lock(code):
+        engine = await _load_engine(code)
+        result = engine.process_action(player_id, action, amount)
+        await _save_engine(code, engine)
     await redis_client.touch_activity(code)
 
     return result
@@ -322,14 +334,15 @@ async def deal_next_hand(code: str, player_id: str, pin: str) -> dict[str, Any]:
 
     await verify_player(code, player_id, pin)
 
-    engine = await _load_engine(code)
-    if engine.hand_active:
-        raise ValueError("Current hand is still in progress")
-    if engine.paused:
-        raise ValueError("Game is paused")
+    async with _get_lock(code):
+        engine = await _load_engine(code)
+        if engine.hand_active:
+            raise ValueError("Current hand is still in progress")
+        if engine.paused:
+            raise ValueError("Game is paused")
 
-    result = engine.start_new_hand()
-    await _save_engine(code, engine)
+        result = engine.start_new_hand()
+        await _save_engine(code, engine)
     await redis_client.touch_activity(code)
 
     return result
@@ -339,9 +352,10 @@ async def request_rebuy(code: str, player_id: str, pin: str) -> dict[str, Any]:
     """Handle a rebuy request."""
     await verify_player(code, player_id, pin)
 
-    engine = await _load_engine(code)
-    result = engine.rebuy(player_id)
-    await _save_engine(code, engine)
+    async with _get_lock(code):
+        engine = await _load_engine(code)
+        result = engine.rebuy(player_id)
+        await _save_engine(code, engine)
     await redis_client.touch_activity(code)
 
     return result
@@ -351,9 +365,10 @@ async def cancel_rebuy(code: str, player_id: str, pin: str) -> dict[str, Any]:
     """Cancel a queued rebuy request."""
     await verify_player(code, player_id, pin)
 
-    engine = await _load_engine(code)
-    result = engine.cancel_rebuy(player_id)
-    await _save_engine(code, engine)
+    async with _get_lock(code):
+        engine = await _load_engine(code)
+        result = engine.cancel_rebuy(player_id)
+        await _save_engine(code, engine)
     await redis_client.touch_activity(code)
 
     return result
@@ -363,9 +378,10 @@ async def show_cards(code: str, player_id: str, pin: str) -> dict[str, Any]:
     """Allow a player to voluntarily show their cards after a hand."""
     await verify_player(code, player_id, pin)
 
-    engine = await _load_engine(code)
-    result = engine.show_cards(player_id)
-    await _save_engine(code, engine)
+    async with _get_lock(code):
+        engine = await _load_engine(code)
+        result = engine.show_cards(player_id)
+        await _save_engine(code, engine)
 
     return result
 
@@ -380,12 +396,13 @@ async def toggle_pause(code: str, player_id: str, pin: str) -> dict[str, Any]:
 
     await verify_player(code, player_id, pin)
 
-    engine = await _load_engine(code)
-    if engine.paused:
-        result = engine.unpause()
-    else:
-        result = engine.pause()
-    await _save_engine(code, engine)
+    async with _get_lock(code):
+        engine = await _load_engine(code)
+        if engine.paused:
+            result = engine.unpause()
+        else:
+            result = engine.pause()
+        await _save_engine(code, engine)
     await redis_client.touch_activity(code)
 
     return result
