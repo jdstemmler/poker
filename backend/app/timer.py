@@ -8,8 +8,9 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from app import redis_client
+from app import game_manager, redis_client
 from app.engine import GameEngine
+from app.game_manager import _get_lock
 
 if TYPE_CHECKING:
     from app.ws_manager import ConnectionManager
@@ -106,86 +107,99 @@ class ActionTimer:
 
     async def _handle_timeout(self, code: str) -> None:
         """Auto-fold the current player whose turn expired."""
-        engine_data = await redis_client.load_engine(code)
-        if engine_data is None:
-            return
+        engine: GameEngine | None = None
 
-        engine = GameEngine.from_dict(engine_data)
+        async with _get_lock(code):
+            engine_data = await redis_client.load_engine(code)
+            if engine_data is None:
+                return
 
-        if not engine.hand_active:
-            return
+            eng = GameEngine.from_dict(engine_data)
 
-        # Verify deadline still matches (another action may have already happened)
-        if engine.action_deadline is None:
-            return
-        if time.time() < engine.action_deadline:
-            # Deadline was reset (player acted in time) — re-register
-            self._deadlines[code] = engine.action_deadline
-            return
+            if not eng.hand_active:
+                return
 
-        # Find the player who timed out
-        action_player = engine.seats[engine.action_on_idx]
-        if not action_player.is_active:
-            return
+            # Verify deadline still matches (another action may have already happened)
+            if eng.action_deadline is None:
+                return
+            if time.time() < eng.action_deadline:
+                # Deadline was reset (player acted in time) — re-register
+                self._deadlines[code] = eng.action_deadline
+                return
 
-        logger.info(
-            "Auto-fold: game=%s player=%s (%s) timed out",
-            code,
-            action_player.player_id,
-            action_player.name,
-        )
+            # Find the player who timed out
+            action_player = eng.seats[eng.action_on_idx]
+            if not action_player.is_active:
+                return
 
-        # Determine auto-action: check if possible, otherwise fold
-        to_call = engine.current_bet - action_player.bet_this_round
-        if to_call == 0:
-            # Can check — auto-check is friendlier
-            engine.process_action(action_player.player_id, "check")
-        else:
-            engine.process_action(action_player.player_id, "fold")
+            logger.info(
+                "Auto-fold: game=%s player=%s (%s) timed out",
+                code,
+                action_player.player_id,
+                action_player.name,
+            )
 
-        await redis_client.store_engine(code, engine.to_dict())
+            # Determine auto-action: check if possible, otherwise fold
+            to_call = eng.current_bet - action_player.bet_this_round
+            if to_call == 0:
+                # Can check — auto-check is friendlier
+                eng.process_action(action_player.player_id, "check")
+            else:
+                eng.process_action(action_player.player_id, "fold")
 
-        # Register next deadline if hand is still active
-        if engine.hand_active and engine.action_deadline:
-            self._deadlines[code] = engine.action_deadline
+            await game_manager._save_engine(code, eng)
 
-        # Broadcast updated state to all players
-        await self._broadcast_engine_state(code, engine)
+            # Register next deadline if hand is still active
+            if eng.hand_active and eng.action_deadline:
+                self._deadlines[code] = eng.action_deadline
+
+            engine = eng
+
+        # Broadcast updated state to all players (outside lock)
+        if engine is not None:
+            await self._broadcast_engine_state(code, engine)
 
     async def _handle_auto_deal(self, code: str) -> None:
         """Auto-deal the next hand when the auto-deal deadline expires."""
-        engine_data = await redis_client.load_engine(code)
-        if engine_data is None:
-            return
+        engine: GameEngine | None = None
 
-        engine = GameEngine.from_dict(engine_data)
+        async with _get_lock(code):
+            engine_data = await redis_client.load_engine(code)
+            if engine_data is None:
+                return
 
-        if engine.hand_active:
-            return  # Hand already in progress (someone dealt manually)
+            eng = GameEngine.from_dict(engine_data)
 
-        if engine.auto_deal_deadline is None:
-            return  # Auto-deal was cancelled
+            if eng.hand_active:
+                return  # Hand already in progress (someone dealt manually)
 
-        if time.time() < engine.auto_deal_deadline:
-            # Deadline was reset — re-register
-            self._auto_deal_deadlines[code] = engine.auto_deal_deadline
-            return
+            if eng.auto_deal_deadline is None:
+                return  # Auto-deal was cancelled
 
-        # Check enough players to continue
-        live_players = [p for p in engine.seats if not p.is_sitting_out]
-        if len(live_players) < 2:
-            return
+            if time.time() < eng.auto_deal_deadline:
+                # Deadline was reset — re-register
+                self._auto_deal_deadlines[code] = eng.auto_deal_deadline
+                return
 
-        logger.info("Auto-deal: game=%s hand=%d", code, engine.hand_number + 1)
+            # Check enough players to continue
+            live_players = [p for p in eng.seats if not p.is_sitting_out]
+            if len(live_players) < 2:
+                return
 
-        engine.start_new_hand()
-        await redis_client.store_engine(code, engine.to_dict())
+            logger.info("Auto-deal: game=%s hand=%d", code, eng.hand_number + 1)
 
-        # Register next action deadline if hand started with a timer
-        if engine.hand_active and engine.action_deadline:
-            self._deadlines[code] = engine.action_deadline
+            eng.start_new_hand()
+            await game_manager._save_engine(code, eng)
 
-        await self._broadcast_engine_state(code, engine)
+            # Register next action deadline if hand started with a timer
+            if eng.hand_active and eng.action_deadline:
+                self._deadlines[code] = eng.action_deadline
+
+            engine = eng
+
+        # Broadcast outside lock
+        if engine is not None:
+            await self._broadcast_engine_state(code, engine)
 
     async def _broadcast_engine_state(self, code: str, engine: GameEngine) -> None:
         """Send per-player views after auto-action."""
@@ -199,7 +213,7 @@ class ActionTimer:
                 msg = json.dumps({"type": "game_state", "data": view})
                 await self._manager.send_to_player(code, pid, msg)
             except Exception:
-                pass
+                logger.debug("Failed to send state to %s in %s", pid, code, exc_info=True)
 
         # Spectators
         spectator_count = self._manager.get_spectator_count(code)
@@ -210,7 +224,7 @@ class ActionTimer:
                 for conn in list(self._manager._spectators.get(code, [])):
                     await conn.send(spec_msg)
             except Exception:
-                pass
+                logger.debug("Failed to send spectator state for %s", code, exc_info=True)
 
 
 # Singleton

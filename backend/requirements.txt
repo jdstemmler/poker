@@ -3,6 +3,7 @@ uvicorn[standard]==0.34.0
 redis[hiredis]==5.2.1
 pydantic==2.10.4
 python-multipart==0.0.20
+slowapi>=0.1.9
 
 # Testing
 pytest==9.0.2

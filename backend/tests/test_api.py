@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import os
 from unittest.mock import AsyncMock, patch, MagicMock
+
+# Disable rate limiting before importing the app module
+os.environ.setdefault("RATE_LIMIT_ENABLED", "0")
 
 import pytest
 from httpx import ASGITransport, AsyncClient

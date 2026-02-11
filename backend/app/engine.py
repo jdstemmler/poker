@@ -1194,7 +1194,7 @@ class GameEngine:
             self.rebuy_cutoff_minutes > 0
             and self.game_started_at is not None
         ):
-            elapsed = (time.time() - self.game_started_at) / 60.0
+            elapsed = self._effective_elapsed() / 60.0
             if elapsed >= self.rebuy_cutoff_minutes:
                 return False
         return True
@@ -1225,7 +1225,7 @@ class GameEngine:
             self.rebuy_cutoff_minutes > 0
             and self.game_started_at is not None
         ):
-            elapsed = (time.time() - self.game_started_at) / 60.0
+            elapsed = self._effective_elapsed() / 60.0
             if elapsed >= self.rebuy_cutoff_minutes:
                 raise ValueError(
                     f"Rebuy window has closed ({self.rebuy_cutoff_minutes} min)"
