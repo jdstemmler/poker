@@ -54,15 +54,13 @@ async def create_game(
         "created_at": time.time(),
         "settings": {
             "starting_chips": req.starting_chips,
-            "small_blind": req.small_blind,
-            "big_blind": req.big_blind,
             "max_players": req.max_players,
             "allow_rebuys": req.allow_rebuys,
             "max_rebuys": req.max_rebuys,
             "rebuy_cutoff_minutes": req.rebuy_cutoff_minutes,
             "turn_timeout": req.turn_timeout,
             "blind_level_duration": req.blind_level_duration,
-            "blind_multiplier": req.blind_multiplier,
+            "target_game_time": req.target_game_time,
             "auto_deal_enabled": req.auto_deal_enabled,
         },
     }
@@ -175,14 +173,12 @@ async def start_game(code: str, player_id: str, pin: str) -> GameState:
         game_code=code,
         players=[{"id": p["id"], "name": p["name"]} for p in players],
         starting_chips=game_data["settings"]["starting_chips"],
-        small_blind=game_data["settings"]["small_blind"],
-        big_blind=game_data["settings"]["big_blind"],
         allow_rebuys=game_data["settings"]["allow_rebuys"],
         max_rebuys=game_data["settings"].get("max_rebuys", 1),
         rebuy_cutoff_minutes=game_data["settings"].get("rebuy_cutoff_minutes", 60),
         turn_timeout=game_data["settings"].get("turn_timeout", 0),
-        blind_level_duration=game_data["settings"].get("blind_level_duration", 0),
-        blind_multiplier=game_data["settings"].get("blind_multiplier", 2.0),
+        blind_level_duration=game_data["settings"].get("blind_level_duration", 20),
+        target_game_time=game_data["settings"].get("target_game_time", 4),
         auto_deal_enabled=game_data["settings"].get("auto_deal_enabled", True),
     )
     engine_state = engine.start_new_hand()

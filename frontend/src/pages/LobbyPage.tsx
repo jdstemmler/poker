@@ -130,13 +130,16 @@ export default function LobbyPage() {
 
       <div className="settings-pills">
         <span className="pill">{game.settings.starting_chips} chips</span>
-        <span className="pill">{game.settings.small_blind}/{game.settings.big_blind} blinds</span>
         {game.settings.allow_rebuys && (
           <span className="pill">🔄 Rebuys{game.settings.max_rebuys > 0 ? ` ×${game.settings.max_rebuys}` : ""}{game.settings.rebuy_cutoff_minutes > 0 ? ` (${game.settings.rebuy_cutoff_minutes}m)` : ""}</span>
         )}
         {game.settings.turn_timeout > 0 && <span className="pill">⏱ {game.settings.turn_timeout}s</span>}
         {!game.settings.auto_deal_enabled && <span className="pill">🤚 Manual Deal</span>}
-        {game.settings.blind_level_duration > 0 && <span className="pill">📈 Blinds every {game.settings.blind_level_duration}m ({game.settings.blind_multiplier === 0 ? "Linear" : `${game.settings.blind_multiplier}×`})</span>}
+        {game.settings.target_game_time > 0 ? (
+          <span className="pill">📈 ~{game.settings.target_game_time}h • Blinds every {game.settings.blind_level_duration}m</span>
+        ) : (
+          <span className="pill">📌 Fixed Blinds</span>
+        )}
       </div>
 
       <div className="player-list">

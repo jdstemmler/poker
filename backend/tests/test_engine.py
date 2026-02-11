@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import patch
 
 from app.cards import Card, Deck, Rank, Suit
-from app.engine import GameEngine, PlayerState, Street, HandHistory, _round_blind
+from app.engine import GameEngine, PlayerState, Street, HandHistory, _round_blind, _nice_blind
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -366,47 +366,87 @@ class TestRoundBlind:
 
 
 class TestBlindSchedule:
-    def test_no_schedule_when_duration_zero(self):
-        e = _make_engine(3, blind_level_duration=0)
+    def test_no_schedule_when_target_zero(self):
+        """target_game_time=0 means fixed blinds — no schedule."""
+        e = _make_engine(3, starting_chips=5000, target_game_time=0)
         assert e.blind_schedule == []
 
-    def test_schedule_built_when_duration_set(self):
-        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=15)
+    def test_blinds_derived_from_chips(self):
+        """When no explicit blinds, BB = chips/100, SB = BB/2."""
+        e = _make_engine(3, starting_chips=5000, small_blind=0, big_blind=0)
+        assert e.big_blind == 50  # 5000/100 = 50
+        assert e.small_blind == 25
+
+    def test_blinds_derived_small_chips(self):
+        """Small chip amounts still produce valid blinds."""
+        e = _make_engine(3, starting_chips=100, small_blind=0, big_blind=0)
+        assert e.big_blind == 2  # max(2, 100/100) → 2 is closest standard value
+        assert e.small_blind == 1
+
+    def test_nice_blind_snaps_to_standard(self):
+        """_nice_blind should snap to standard tournament values."""
+        assert _nice_blind(50) == 50
+        assert _nice_blind(73) == 80  # snaps to nearest standard (80)
+        assert _nice_blind(110) == 100  # 100 is closer than 150
+        assert _nice_blind(125) == 100  # 100 or 150 — equidistant, picks lower
+        assert _nice_blind(130) == 150  # 150 is closer
+        assert _nice_blind(450) == 400  # 400 vs 500 — equidistant, picks lower
+        assert _nice_blind(460) == 500  # 500 is closer
+        assert _nice_blind(1) == 1
+
+    def test_schedule_built_for_target(self):
+        """Schedule should be built when target_game_time > 0."""
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=20, target_game_time=4)
         assert len(e.blind_schedule) > 0
-        assert e.blind_schedule[0] == (10, 20)
+        # First level should match derived initial blinds
+        assert e.blind_schedule[0] == (e.small_blind, e.big_blind)
 
-    def test_multiplier_default_doubles(self):
-        """Default multiplier (2.0) should double blinds each level."""
-        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=10)
-        assert len(e.blind_schedule) == 11  # initial + 10 generated
-        assert e.blind_schedule[0] == (10, 20)
-        assert e.blind_schedule[1] == (20, 40)
-        assert e.blind_schedule[2] == (40, 80)
+    def test_schedule_values_are_standard(self):
+        """All schedule values should be standard tournament blind amounts."""
+        from app.engine import _STANDARD_BLINDS
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=20, target_game_time=4)
+        for sb, bb in e.blind_schedule:
+            assert bb in _STANDARD_BLINDS, f"BB={bb} not in standard blinds"
 
-    def test_multiplier_1_5x(self):
-        """1.5× multiplier should increase blinds by 50% each level."""
-        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=10, blind_multiplier=1.5)
-        assert e.blind_schedule[0] == (10, 20)
-        assert e.blind_schedule[1] == (15, 30)
-        # 15 * 1.5 = 22.5 → round to 22 → nearest 5 = 20; 30 * 1.5 = 45
-        assert e.blind_schedule[2] == (20, 45)
+    def test_schedule_starts_linear(self):
+        """First few levels should grow by initial BB (linear)."""
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=20, target_game_time=4)
+        # BB should go 50, 100, 150, 200, 250, 300 in early levels
+        assert e.blind_schedule[0][1] == 50
+        assert e.blind_schedule[1][1] == 100
+        assert e.blind_schedule[2][1] == 150
 
-    def test_multiplier_additive_linear(self):
-        """multiplier=0 should add initial blinds each level (linear)."""
-        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=10, blind_multiplier=0)
-        assert e.blind_schedule[0] == (10, 20)
-        assert e.blind_schedule[1] == (20, 40)
-        assert e.blind_schedule[2] == (30, 60)
-        assert e.blind_schedule[3] == (40, 80)
-        assert e.blind_schedule[10] == (110, 220)
+    def test_schedule_levels_increase(self):
+        """Each level's BB should be >= the previous level's BB."""
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=20, target_game_time=4)
+        for i in range(1, len(e.blind_schedule)):
+            assert e.blind_schedule[i][1] >= e.blind_schedule[i - 1][1]
 
-    def test_multiplier_preserved_in_serialization(self):
-        """blind_multiplier should survive to_dict/from_dict round-trip."""
-        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=10, blind_multiplier=1.5)
+    def test_schedule_reaches_all_in_level(self):
+        """The schedule should reach or exceed starting_chips as BB."""
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=20, target_game_time=4)
+        max_bb = max(bb for _, bb in e.blind_schedule)
+        assert max_bb >= e.starting_chips
+
+    def test_schedule_no_duplicate_consecutive_levels(self):
+        """No two consecutive levels should be identical (deduplication)."""
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=20, target_game_time=4)
+        for i in range(1, len(e.blind_schedule)):
+            assert e.blind_schedule[i] != e.blind_schedule[i - 1]
+
+    def test_schedule_sb_less_than_bb(self):
+        """SB should always be less than BB at every level."""
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=10, target_game_time=2)
+        for sb, bb in e.blind_schedule:
+            assert sb < bb, f"SB={sb} >= BB={bb}"
+
+    def test_target_game_time_preserved_in_serialization(self):
+        """target_game_time should survive to_dict/from_dict round-trip."""
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=20, target_game_time=3)
         d = e.to_dict()
-        assert d["blind_multiplier"] == 1.5
+        assert d["target_game_time"] == 3
         e2 = GameEngine.from_dict(d)
-        assert e2.blind_multiplier == 1.5
+        assert e2.target_game_time == 3
         assert e2.blind_schedule == e.blind_schedule
 
     def test_custom_schedule(self):
@@ -415,7 +455,7 @@ class TestBlindSchedule:
         assert e.blind_schedule == custom
 
     def test_blind_level_advances(self):
-        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=1)
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=1, target_game_time=1)
         # Fake: game started 2 minutes ago
         _deal_and_get(e)
         e.game_started_at = time.time() - 120  # 2 minutes ago
@@ -423,12 +463,13 @@ class TestBlindSchedule:
         e._maybe_advance_blind_level()
         assert e.blind_level >= 1
 
-    def test_next_blind_change_none_when_disabled(self):
-        e = _make_engine(3, blind_level_duration=0)
+    def test_next_blind_change_none_when_fixed(self):
+        """Fixed blinds (no schedule) should return None for next change."""
+        e = _make_engine(3, starting_chips=5000, target_game_time=0)
         assert e.get_next_blind_change_at() is None
 
     def test_next_blind_change_none_when_paused(self):
-        e = _make_engine(3, small_blind=10, big_blind=20, blind_level_duration=15)
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=15, target_game_time=2)
         _deal_and_get(e)
         # End the hand so we can pause
         for _ in range(10):
@@ -438,6 +479,54 @@ class TestBlindSchedule:
             e.process_action(pid, "fold")
         e.pause()
         assert e.get_next_blind_change_at() is None
+
+    def test_various_chip_levels(self):
+        """Schedule works for a variety of chip/time combos."""
+        for chips, hours in [(1000, 2), (5000, 4), (10000, 3), (50000, 6)]:
+            e = _make_engine(3, starting_chips=chips, blind_level_duration=15, target_game_time=hours)
+            assert len(e.blind_schedule) >= 3, f"chips={chips}, hours={hours}"
+            assert e.blind_schedule[0] == (e.small_blind, e.big_blind)
+
+    def test_overtime_levels_reach_3x_chips(self):
+        """Pre-built schedule should extend until BB >= 3× starting chips."""
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=20, target_game_time=4)
+        max_bb = max(bb for _, bb in e.blind_schedule)
+        assert max_bb >= 5000 * 3
+
+    def test_dynamic_extension_beyond_schedule(self):
+        """Clock past the last level should grow the schedule dynamically."""
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=1, target_game_time=1)
+        _deal_and_get(e)
+        original_len = len(e.blind_schedule)
+        # Simulate enough time to far exceed the built schedule
+        e.game_started_at = time.time() - (original_len + 5) * 60
+        e.total_paused_seconds = 0
+        e._maybe_advance_blind_level()
+        # Schedule should have been extended dynamically
+        assert len(e.blind_schedule) > original_len
+        # Blinds should be higher than the last pre-built level
+        assert e.big_blind > e.blind_schedule[original_len - 1][1]
+
+    def test_dynamic_extension_always_increases(self):
+        """Each dynamically added level should have a higher BB."""
+        e = _make_engine(3, starting_chips=1000, blind_level_duration=1, target_game_time=1)
+        _deal_and_get(e)
+        original_len = len(e.blind_schedule)
+        e.game_started_at = time.time() - (original_len + 10) * 60
+        e.total_paused_seconds = 0
+        e._maybe_advance_blind_level()
+        for i in range(1, len(e.blind_schedule)):
+            assert e.blind_schedule[i][1] >= e.blind_schedule[i - 1][1]
+
+    def test_next_blind_change_always_available(self):
+        """get_next_blind_change_at should always return a value (dynamic)."""
+        e = _make_engine(3, starting_chips=5000, blind_level_duration=1, target_game_time=1)
+        _deal_and_get(e)
+        original_last = len(e.blind_schedule) - 1
+        # Set level to what was the last pre-built level
+        e.blind_level = original_last
+        # Should still return a next change time (not None)
+        assert e.get_next_blind_change_at() is not None
 
 
 # ── Auto-deal toggle ────────────────────────────────────────────────

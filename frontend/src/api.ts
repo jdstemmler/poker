@@ -28,15 +28,13 @@ export function createGame(data: {
   creator_name: string;
   creator_pin: string;
   starting_chips?: number;
-  small_blind?: number;
-  big_blind?: number;
   max_players?: number;
   allow_rebuys?: boolean;
   max_rebuys?: number;
   rebuy_cutoff_minutes?: number;
   turn_timeout?: number;
   blind_level_duration?: number;
-  blind_multiplier?: number;
+  target_game_time?: number;
   auto_deal_enabled?: boolean;
 }): Promise<CreateGameResponse> {
   return request("/api/games", {

@@ -77,59 +77,111 @@ function NumericInput({
   );
 }
 
-/** Mirror the backend _round_blind logic for preview.
- *  Uses banker's rounding to match Python's round(). */
-function bankersRound(n: number): number {
-  const floor = Math.floor(n);
-  const frac = n - floor;
-  if (Math.abs(frac - 0.5) < 1e-9) return floor % 2 === 0 ? floor : floor + 1;
-  return Math.round(n);
-}
+/** Standard tournament blind values: factors [1,1.5,2,2.5,3,4,5,6,8] × decade */
+const STANDARD_BLINDS = [
+  1, 2, 3, 4, 5, 6, 8,
+  10, 15, 20, 25, 30, 40, 50, 60, 80,
+  100, 150, 200, 250, 300, 400, 500, 600, 800,
+  1000, 1500, 2000, 2500, 3000, 4000, 5000, 6000, 8000,
+  10000, 15000, 20000, 25000, 30000, 40000, 50000, 60000, 80000,
+  100000,
+];
 
-function roundBlind(value: number): number {
-  const v = bankersRound(value);
-  if (v >= 100) return bankersRound(v / 10) * 10;
-  if (v >= 10) return bankersRound(v / 5) * 5;
-  return Math.max(1, v);
-}
-
-/** Build a blind schedule preview (same algorithm as backend).
- *  multiplier=0 means additive (add initial blinds each level). */
-function buildSchedulePreview(startSb: number, startBb: number, multiplier: number): [number, number][] {
-  const schedule: [number, number][] = [[startSb, startBb]];
-  let sb = startSb;
-  let bb = startBb;
-  const additive = multiplier === 0;
-  for (let i = 0; i < 10; i++) {
-    if (additive) {
-      sb += startSb;
-      bb += startBb;
-    } else {
-      sb *= multiplier;
-      bb *= multiplier;
-    }
-    schedule.push([roundBlind(sb), roundBlind(bb)]);
+/** Snap a value to the nearest standard tournament blind amount. */
+function niceBlind(value: number): number {
+  if (value <= 1) return 1;
+  const v = Math.round(value);
+  let lo = 0;
+  let hi = STANDARD_BLINDS.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (STANDARD_BLINDS[mid] < v) lo = mid + 1;
+    else hi = mid;
   }
-  return schedule;
+  if (lo === 0) return STANDARD_BLINDS[0];
+  if (lo >= STANDARD_BLINDS.length) return STANDARD_BLINDS[STANDARD_BLINDS.length - 1];
+  const before = STANDARD_BLINDS[lo - 1];
+  const after = STANDARD_BLINDS[lo];
+  return (value - before) <= (after - value) ? before : after;
+}
+
+/** Build a blind schedule preview matching the backend algorithm.
+ *  Phase 1 (~half): linear. Phase 2: geometric to starting_chips.
+ *  Phase 3 (overtime): 1.5× per level until BB ≥ 3× chips. */
+function buildTargetSchedulePreview(
+  startingChips: number,
+  levelDurationMin: number,
+  targetGameTimeHrs: number,
+): [number, number][] {
+  const bbInitial = Math.max(2, niceBlind(startingChips / 100));
+
+  const totalMinutes = targetGameTimeHrs * 60;
+  const nLevels = Math.max(3, Math.floor(totalMinutes / levelDurationMin));
+
+  const phase1Count = Math.max(2, Math.round(nLevels * 0.5));
+  const phase2Count = (nLevels + 2) - phase1Count; // +2 buffer beyond target
+
+  const scheduleBb: number[] = [];
+
+  // Phase 1: linear
+  for (let i = 0; i < phase1Count; i++) {
+    scheduleBb.push(niceBlind(bbInitial * (i + 1)));
+  }
+
+  // Phase 2: geometric
+  const lastBb = scheduleBb[scheduleBb.length - 1];
+  const bbTarget = startingChips;
+  if (phase2Count > 0 && lastBb < bbTarget) {
+    let ratio = Math.pow(bbTarget / lastBb, 1.0 / Math.max(1, phase2Count - 1));
+    ratio = Math.max(ratio, 1.2);
+    for (let i = 1; i <= phase2Count; i++) {
+      scheduleBb.push(niceBlind(lastBb * Math.pow(ratio, i)));
+    }
+  }
+
+  // Phase 3: overtime at 1.5× until BB ≥ 3× starting chips
+  const overtimeCap = startingChips * 3;
+  while (scheduleBb[scheduleBb.length - 1] < overtimeCap) {
+    const nxt = niceBlind(scheduleBb[scheduleBb.length - 1] * 1.5);
+    scheduleBb.push(nxt > scheduleBb[scheduleBb.length - 1] ? nxt : scheduleBb[scheduleBb.length - 1] + 1);
+  }
+
+  // Build (SB, BB) tuples
+  const schedule: [number, number][] = scheduleBb.map((bb) => [
+    Math.max(1, Math.floor(bb / 2)),
+    bb,
+  ]);
+
+  // Deduplicate consecutive identical levels
+  const deduped: [number, number][] = [schedule[0]];
+  for (let i = 1; i < schedule.length; i++) {
+    const [ps, pb] = deduped[deduped.length - 1];
+    const [s, b] = schedule[i];
+    if (s !== ps || b !== pb) deduped.push([s, b]);
+  }
+  return deduped;
 }
 
 export default function CreateGamePage() {
   const navigate = useNavigate();
   const [helpOpen, setHelpOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
-  const [startingChips, setStartingChips] = useState(1000);
-  const [smallBlind, setSmallBlind] = useState(10);
-  const [bigBlind, setBigBlind] = useState(20);
+  const [startingChips, setStartingChips] = useState(5000);
+  const [targetGameTime, setTargetGameTime] = useState(4);
+  const [blindLevelDuration, setBlindLevelDuration] = useState(20);
   const [allowRebuys, setAllowRebuys] = useState(true);
   const [maxRebuys, setMaxRebuys] = useState(1);
   const [rebuyCutoffMinutes, setRebuyCutoffMinutes] = useState(60);
   const [turnTimeout, setTurnTimeout] = useState(0);
-  const [blindLevelDuration, setBlindLevelDuration] = useState(0);
-  const [blindMultiplier, setBlindMultiplier] = useState(2.0);
   const [autoDealEnabled, setAutoDealEnabled] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const blindsIncrease = targetGameTime > 0;
+  const bbInitial = Math.max(2, niceBlind(startingChips / 100));
+  const sbInitial = Math.max(1, Math.floor(bbInitial / 2));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,14 +192,12 @@ export default function CreateGamePage() {
         creator_name: name.trim(),
         creator_pin: pin,
         starting_chips: startingChips,
-        small_blind: smallBlind,
-        big_blind: bigBlind,
         allow_rebuys: allowRebuys,
         max_rebuys: allowRebuys ? maxRebuys : 0,
         rebuy_cutoff_minutes: allowRebuys ? rebuyCutoffMinutes : 0,
         turn_timeout: turnTimeout,
         blind_level_duration: blindLevelDuration,
-        blind_multiplier: blindLevelDuration > 0 ? blindMultiplier : 2.0,
+        target_game_time: targetGameTime,
         auto_deal_enabled: autoDealEnabled,
       });
       sessionStorage.setItem("playerId", res.player_id);
@@ -211,72 +261,46 @@ export default function CreateGamePage() {
             <NumericInput
               value={startingChips}
               onChange={setStartingChips}
-              placeholder="1000"
+              placeholder="5000"
             />
+            <span className="hint">Starting blinds: {sbInitial}/{bbInitial}</span>
           </label>
 
           <div className="row">
             <label>
-              Small Blind
+              Target Game Time (hours)
               <NumericInput
-                value={smallBlind}
-                onChange={setSmallBlind}
-                placeholder="10"
+                value={targetGameTime}
+                onChange={setTargetGameTime}
+                placeholder="0 = fixed blinds"
+                emptyValue={0}
               />
+              <span className="hint">{blindsIncrease ? `~${targetGameTime}h game` : "Fixed blinds"}</span>
             </label>
-            <label>
-              Big Blind
-              <NumericInput
-                value={bigBlind}
-                onChange={setBigBlind}
-                placeholder="20"
-              />
-            </label>
+
+            {blindsIncrease && (
+              <label>
+                Level Duration (min)
+                <NumericInput
+                  value={blindLevelDuration}
+                  onChange={(v) => setBlindLevelDuration(Math.max(5, Math.min(60, v)))}
+                  placeholder="20"
+                />
+                <span className="hint">Every {blindLevelDuration} min</span>
+              </label>
+            )}
           </div>
 
-          <label>
-            Blind Level Duration (min)
-            <NumericInput
-              value={blindLevelDuration}
-              onChange={setBlindLevelDuration}
-              placeholder="0 = no increases"
-              emptyValue={0}
-            />
-            {blindLevelDuration > 0 && (
-              <span className="hint">Blinds increase every {blindLevelDuration} min</span>
-            )}
-          </label>
-
-          {blindLevelDuration > 0 && (
+          {blindsIncrease && (
             <>
-              <div className="form-group">
-                <span className="label-text">Blind Increase</span>
-                <div className="multiplier-options">
-                  {[0, 1.5, 2].map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      className={`multiplier-btn${blindMultiplier === m ? " active" : ""}`}
-                      onClick={() => setBlindMultiplier(m)}
-                    >
-                      {m === 0 ? "Linear" : `${m}×`}
-                    </button>
-                  ))}
-                </div>
-                <span className="hint">{blindMultiplier === 0 ? "Blinds increase by the initial blind each level" : `Blinds multiply by ${blindMultiplier}× each level`}</span>
-              </div>
-
-              <div className="blind-schedule-preview">
-                <span className="schedule-title">Blind Schedule Preview</span>
-                <div className="schedule-table">
-                  {buildSchedulePreview(smallBlind, bigBlind, blindMultiplier).map(([sb, bb], i) => (
-                    <div key={i} className={`schedule-row${i === 0 ? " current" : ""}`}>
-                      <span className="schedule-level">L{i + 1}</span>
-                      <span className="schedule-blinds">{sb}/{bb}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setScheduleOpen(true)}
+                style={{ marginTop: "0.25rem" }}
+              >
+                View Blind Schedule
+              </button>
             </>
           )}
         </fieldset>
@@ -348,6 +372,35 @@ export default function CreateGamePage() {
         </button>
       </form>
 
+      {/* Blind Schedule Modal */}
+      {blindsIncrease && scheduleOpen && (
+        <div className="help-backdrop" onClick={() => setScheduleOpen(false)}>
+          <div className="help-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="help-modal-header">
+              <h2>Blind Schedule</h2>
+              <button className="help-modal-close" onClick={() => setScheduleOpen(false)} aria-label="Close">✕</button>
+            </div>
+            <div className="help-modal-body">
+              <div className="schedule-table">
+                {buildTargetSchedulePreview(startingChips, blindLevelDuration, targetGameTime).map(([sb, bb], i) => {
+                  const totalMin = i * blindLevelDuration;
+                  const hrs = Math.floor(totalMin / 60);
+                  const mins = totalMin % 60;
+                  const timeStr = `+${hrs}:${String(mins).padStart(2, "0")}`;
+                  return (
+                    <div key={i} className={`schedule-row${i === 0 ? " current" : ""}`}>
+                      <span className="schedule-level">L{i + 1}</span>
+                      <span className="schedule-blinds">{sb}/{bb}</span>
+                      <span className="schedule-time">{timeStr}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} title="Game Settings Help">
         <h3>Your Identity</h3>
         <dl>
@@ -363,21 +416,17 @@ export default function CreateGamePage() {
         <h3>Game Settings</h3>
         <dl>
           <dt>Starting Chips</dt>
-          <dd>How many chips each player begins with (100–100,000).</dd>
-          <dt>Small Blind / Big Blind</dt>
+          <dd>How many chips each player begins with (100–100,000). Starting blinds are automatically calculated as chips / 50.</dd>
+          <dt>Target Game Time</dt>
           <dd>
-            The forced bets posted each hand. The big blind is typically 2× the
-            small blind.
+            How long you want the game to last. Blinds are calculated automatically
+            using geometric progression to reach all-in level by the target time.
+            Set to <strong>0</strong> for fixed blinds (no increases).
           </dd>
-          <dt>Blind Level Duration</dt>
+          <dt>Level Duration</dt>
           <dd>
-            Minutes between blind increases. Set to <strong>0</strong> for fixed blinds.
-          </dd>
-          <dt>Blind Increase</dt>
-          <dd>
-            How blinds grow each level. <strong>Linear</strong> adds the
-            initial blind each level; other options multiply. Only applies
-            when blind level duration is set.
+            Minutes between blind increases (5–60 min). Only applies when target
+            game time is set.
           </dd>
         </dl>
 
