@@ -1,0 +1,42 @@
+# Auto-deploy systemd service for poker-game.
+#
+# Install:
+#   1. Copy to /etc/systemd/system/poker-deploy.service
+#   2. Edit REPO_DIR, ADMIN_PASSWORD, and User/Group to match your setup
+#   3. sudo systemctl daemon-reload
+#   4. sudo systemctl enable --now poker-deploy
+#
+# Logs:
+#   journalctl -u poker-deploy -f
+
+[Unit]
+Description=Poker Game Auto-Deploy (polls GitHub main branch)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=YOUR_USER
+Group=docker
+
+# Path to the cloned repo on the production machine
+Environment=REPO_DIR=/home/YOUR_USER/poker-game
+Environment=BRANCH=main
+Environment=POLL_INTERVAL=60
+
+# Pass through any app-level env vars needed by docker-compose
+Environment=ADMIN_PASSWORD=your-admin-password-here
+
+ExecStart=/bin/bash /home/YOUR_USER/poker-game/deploy/auto-deploy.sh
+
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=poker-deploy
+
+[Install]
+WantedBy=multi-user.target
