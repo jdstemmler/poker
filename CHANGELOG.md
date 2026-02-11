@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] — 2026-02-11
+
+### Fixed
+- **Blind timer keeps running after game ends** — The blind countdown timer now
+  stops when the game is over. Backend `get_next_blind_change_at()` returns
+  `None` when `game_over` is set; frontend clears the countdown on game end.
+- **Blind timer disappears while paused** — The blind countdown now stays visible
+  (frozen) when the game is paused, matching the behavior of the elapsed and
+  rebuy timers. Previously the backend returned `None` during pause, causing the
+  timer to vanish entirely.
+- **Timer width jitter in header** — Added `font-variant-numeric: tabular-nums`
+  to all timer and blind displays (elapsed, rebuy countdown, blind value, blind
+  countdown) so digits render at equal width. Set `min-width` and `flex` on
+  header sections to keep the rebuy pill and timers stable as numbers change.
+
+### Added
+- **Next blind level preview** — The blind countdown in the header now shows the
+  upcoming blind values alongside the time remaining (e.g. "15/30 in 4:32"
+  instead of "Next: 4:32").
+
 ## [1.4.0] — 2026-02-11
 
 ### Security
