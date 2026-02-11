@@ -268,11 +268,11 @@ export default function CreateGamePage() {
 
           <div className="row">
             <label>
-              Target Game Time (hours)
+              Game Time (hrs)
               <NumericInput
                 value={targetGameTime}
                 onChange={setTargetGameTime}
-                placeholder="0 = fixed blinds"
+                placeholder="0 = fixed"
                 emptyValue={0}
               />
               <span className="hint">{blindsIncrease ? `~${targetGameTime}h game` : "Fixed blinds"}</span>
