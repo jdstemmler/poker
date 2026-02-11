@@ -65,15 +65,14 @@ def _make_game_data(
         "status": status,
         "creator_id": creator_id,
         "settings": {
-            "starting_chips": 1000,
-            "small_blind": 10,
-            "big_blind": 20,
+            "starting_chips": 5000,
             "max_players": 9,
             "allow_rebuys": True,
             "max_rebuys": 1,
             "rebuy_cutoff_minutes": 60,
             "turn_timeout": 0,
-            "blind_level_duration": 0,
+            "blind_level_duration": 20,
+            "target_game_time": 4,
         },
     }
 
@@ -146,9 +145,9 @@ class TestCreateGame:
         req = CreateGameRequest(creator_name="Bob", creator_pin="5678")
 
         _, _, state = await create_game(req)
-        assert state.settings.starting_chips == 1000
-        assert state.settings.small_blind == 10
-        assert state.settings.big_blind == 20
+        assert state.settings.starting_chips == 5000
+        assert state.settings.target_game_time == 4
+        assert state.settings.blind_level_duration == 20
 
 
 # ---------------------------------------------------------------------------

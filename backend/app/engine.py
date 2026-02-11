@@ -6,6 +6,7 @@ pot management, showdown, dealer rotation, and hand lifecycle.
 
 from __future__ import annotations
 
+import bisect
 import time
 from enum import Enum
 from typing import Any, Optional
@@ -90,13 +91,36 @@ class PlayerState:
 
 
 def _round_blind(value: float) -> int:
-    """Round a blind value to a clean number."""
+    """Round a blind value to a clean number (legacy helper)."""
     v = int(round(value))
     if v >= 100:
         return round(v / 10) * 10  # round to nearest 10
     if v >= 10:
         return round(v / 5) * 5  # round to nearest 5
     return max(1, v)
+
+
+# Standard tournament blind values: factors [1,1.5,2,2.5,3,4,5,6,8] × decade
+_STANDARD_BLINDS: list[int] = sorted({
+    round(f * d)
+    for d in (1, 10, 100, 1_000, 10_000, 100_000)
+    for f in (1, 1.5, 2, 2.5, 3, 4, 5, 6, 8)
+})
+
+
+def _nice_blind(value: float) -> int:
+    """Snap a value to the nearest standard tournament blind amount."""
+    if value <= 1:
+        return 1
+    v = round(value)
+    idx = bisect.bisect_left(_STANDARD_BLINDS, v)
+    if idx == 0:
+        return _STANDARD_BLINDS[0]
+    if idx >= len(_STANDARD_BLINDS):
+        return _STANDARD_BLINDS[-1]
+    lo = _STANDARD_BLINDS[idx - 1]
+    hi = _STANDARD_BLINDS[idx]
+    return lo if (value - lo) <= (hi - value) else hi
 
 
 class HandHistory:
@@ -158,8 +182,8 @@ class GameEngine:
         game_code: str,
         players: list[dict[str, Any]],
         starting_chips: int,
-        small_blind: int,
-        big_blind: int,
+        small_blind: int = 0,
+        big_blind: int = 0,
         allow_rebuys: bool = True,
         turn_timeout: int = 0,
         blind_level_duration: int = 0,
@@ -168,25 +192,39 @@ class GameEngine:
         max_rebuys: int = 1,
         rebuy_cutoff_minutes: int = 60,
         auto_deal_enabled: bool = True,
+        target_game_time: int = 0,
     ) -> None:
         self.game_code = game_code
-        self.small_blind = small_blind
-        self.big_blind = big_blind
         self.allow_rebuys = allow_rebuys
         self.max_rebuys = max_rebuys  # 0 = unlimited
         self.rebuy_cutoff_minutes = rebuy_cutoff_minutes  # 0 = no cutoff
         self.starting_chips = starting_chips
         self.turn_timeout = turn_timeout  # 0 = no timer
+        self.target_game_time: int = target_game_time  # hours, 0 = fixed blinds
+
+        # Derive initial blinds from starting chips when using target schedule
+        # or when no explicit blinds are provided
+        if target_game_time > 0 or big_blind <= 0:
+            self.big_blind = max(2, _nice_blind(starting_chips / 100))
+            self.small_blind = max(1, self.big_blind // 2)
+        else:
+            self.big_blind = big_blind
+            self.small_blind = small_blind if small_blind > 0 else big_blind // 2
 
         # Blind level scheduling
         self.blind_level_duration: int = blind_level_duration  # minutes, 0 = disabled
-        self.blind_multiplier: float = blind_multiplier
+        self.blind_multiplier: float = blind_multiplier  # kept for serialisation compat
         if blind_schedule is not None:
             self.blind_schedule: list[tuple[int, int]] = blind_schedule
+        elif blind_level_duration > 0 and target_game_time > 0:
+            # New: build schedule targeting a total game time
+            self.blind_schedule = self._build_schedule_for_target(
+                starting_chips, blind_level_duration, target_game_time,
+            )
         elif blind_level_duration > 0:
-            # Build schedule starting from the initial blinds
+            # Legacy fallback: multiplicative/additive schedule
             self.blind_schedule = self._build_schedule_from(
-                small_blind, big_blind, multiplier=blind_multiplier
+                self.small_blind, self.big_blind, multiplier=blind_multiplier
             )
         else:
             self.blind_schedule = []
@@ -212,7 +250,7 @@ class GameEngine:
         self.pot: int = 0
         self.current_bet: int = 0
         self.action_on_idx: int = 0
-        self.min_raise: int = big_blind
+        self.min_raise: int = self.big_blind
         self.hand_active: bool = False
         self.last_raiser_idx: Optional[int] = None
         self.action_deadline: Optional[float] = None  # Unix timestamp when turn expires
@@ -272,6 +310,71 @@ class GameEngine:
             bb_int = _round_blind(bb)
             schedule.append((sb_int, bb_int))
         return schedule
+
+    @classmethod
+    def _build_schedule_for_target(
+        cls,
+        starting_chips: int,
+        level_duration_minutes: int,
+        target_game_time_hours: int,
+    ) -> list[tuple[int, int]]:
+        """Build a blind schedule using linear-then-geometric growth.
+
+        Phase 1 (~first half of levels): blinds increase linearly,
+        adding the initial BB each level (e.g. 50→100→150→…).
+        Phase 2 (remaining levels): geometric growth to reach
+        starting_chips as BB by the target time.
+        Phase 3 (overtime): continue at ~1.5× per level until BB ≥ 3× chips.
+
+        All values are snapped to standard tournament blind amounts.
+        """
+        bb_initial = max(2, _nice_blind(starting_chips / 100))
+
+        total_minutes = target_game_time_hours * 60
+        n_levels = max(3, total_minutes // level_duration_minutes)
+
+        # Phase 1: linear growth (~half of scheduled levels)
+        phase1_count = max(2, round(n_levels * 0.5))
+        phase2_count = (n_levels + 2) - phase1_count  # +2 buffer beyond target
+
+        schedule_bb: list[int] = []
+
+        # Phase 1: add bb_initial each level
+        for i in range(phase1_count):
+            schedule_bb.append(_nice_blind(bb_initial * (i + 1)))
+
+        # Phase 2: geometric from last phase-1 value toward starting_chips
+        last_bb = schedule_bb[-1]
+        bb_target = starting_chips
+
+        if phase2_count > 0 and last_bb < bb_target:
+            ratio = (bb_target / last_bb) ** (1.0 / max(1, phase2_count - 1))
+            ratio = max(ratio, 1.2)  # at least 20 % growth per level
+            for i in range(1, phase2_count + 1):
+                raw = last_bb * (ratio ** i)
+                schedule_bb.append(_nice_blind(raw))
+
+        # Phase 3 (overtime): continue at 1.5× until BB ≥ 3× starting chips
+        overtime_cap = starting_chips * 3
+        while schedule_bb[-1] < overtime_cap:
+            nxt = _nice_blind(schedule_bb[-1] * 1.5)
+            if nxt <= schedule_bb[-1]:
+                nxt = schedule_bb[-1] + 1  # safety: guarantee forward progress
+            schedule_bb.append(nxt)
+
+        # Build (SB, BB) tuples — SB is always BB // 2
+        schedule: list[tuple[int, int]] = []
+        for bb in schedule_bb:
+            sb = max(1, bb // 2)
+            schedule.append((sb, bb))
+
+        # Deduplicate consecutive identical levels
+        deduped: list[tuple[int, int]] = [schedule[0]]
+        for level in schedule[1:]:
+            if level != deduped[-1]:
+                deduped.append(level)
+
+        return deduped
 
     # ------------------------------------------------------------------
     # Accessors
@@ -336,7 +439,11 @@ class GameEngine:
         return (now - self.game_started_at) - self.total_paused_seconds
 
     def _maybe_advance_blind_level(self) -> None:
-        """Check elapsed time and advance the blind level if needed."""
+        """Check elapsed time and advance the blind level if needed.
+
+        If the clock has passed the last pre-built level, dynamically
+        extend the schedule at ~1.5× per level so blinds never stall.
+        """
         if (
             self.blind_level_duration <= 0
             or not self.blind_schedule
@@ -346,8 +453,15 @@ class GameEngine:
 
         elapsed_minutes = self._effective_elapsed() / 60.0
         target_level = int(elapsed_minutes // self.blind_level_duration)
-        # Clamp to last level in the schedule
-        target_level = min(target_level, len(self.blind_schedule) - 1)
+
+        # Dynamically extend the schedule if we've exceeded it
+        while target_level >= len(self.blind_schedule):
+            last_sb, last_bb = self.blind_schedule[-1]
+            new_bb = _nice_blind(last_bb * 1.5)
+            if new_bb <= last_bb:
+                new_bb = last_bb + 1  # guarantee forward progress
+            new_sb = max(1, new_bb // 2)
+            self.blind_schedule.append((new_sb, new_bb))
 
         if target_level > self.blind_level:
             self.blind_level = target_level
@@ -363,8 +477,6 @@ class GameEngine:
             or self.game_started_at is None
         ):
             return None
-        if self.blind_level >= len(self.blind_schedule) - 1:
-            return None  # already at max level
         if self.paused:
             return None  # don't show countdown while paused
         next_level = self.blind_level + 1
@@ -1227,7 +1339,6 @@ class GameEngine:
             "blind_level": self.blind_level,
             "blind_level_duration": self.blind_level_duration,
             "blind_schedule": [[sb, bb] for sb, bb in self.blind_schedule] if self.blind_schedule else [],
-            "blind_multiplier": self.blind_multiplier,
             "next_blind_change_at": self.get_next_blind_change_at(),
             "allow_rebuys": self.allow_rebuys,
             "max_rebuys": self.max_rebuys,
@@ -1315,6 +1426,7 @@ class GameEngine:
             "blind_multiplier": self.blind_multiplier,
             "blind_schedule": [[sb, bb] for sb, bb in self.blind_schedule],
             "blind_level": self.blind_level,
+            "target_game_time": self.target_game_time,
             "community_cards": [c.to_dict() for c in self.community_cards],
             "deck": self.deck.to_dict() if self.deck else None,
             "last_hand_result": self.last_hand_result,
@@ -1374,6 +1486,7 @@ class GameEngine:
         engine.game_started_at = data.get("game_started_at")
         engine.blind_level_duration = data.get("blind_level_duration", 0)
         engine.blind_multiplier = data.get("blind_multiplier", 2.0)
+        engine.target_game_time = data.get("target_game_time", 0)
         raw_schedule = data.get("blind_schedule", [])
         engine.blind_schedule = [(s[0], s[1]) for s in raw_schedule]
         engine.blind_level = data.get("blind_level", 0)

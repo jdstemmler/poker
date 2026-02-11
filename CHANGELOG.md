@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] — 2026-02-10
+
+### Changed
+- **Auto-calculated blind schedule**: Replaced manual small blind / big blind /
+  multiplier inputs with a target-time-based system. New inputs: Starting Chips
+  (default 5,000), Target Game Time (hours, default 4), and Level Duration
+  (minutes, default 20). Blinds are derived automatically (BB = chips / 100,
+  snapped to standard tournament values).
+- **Blind algorithm**: Three-phase schedule — linear ramp for the first half of
+  levels, geometric progression to reach starting-chips BB by target time, then
+  overtime levels at 1.5× until BB ≥ 3× starting chips. All values snapped to a
+  standard tournament blind table via binary search.
+- **Dynamic blind extension**: If the game clock exceeds the pre-built schedule,
+  new levels are appended at runtime (1.5× last BB, snapped to standard values).
+  Blinds never stall regardless of game duration or rebuys.
+- **Schedule preview modal**: "View Blind Schedule" button on the Create Game page
+  opens a full-screen modal showing all levels with SB/BB and cumulative time in
+  +H:MM format.
+- **Create Game form layout**: Target Game Time and Level Duration fields are
+  displayed side-by-side to save vertical space.
+
+### Removed
+- Manual Small Blind, Big Blind, and Blind Multiplier settings (now auto-derived).
+
+## [1.2.0] — 2026-02-10
+
+### Added
+- **Admin dashboard**: Password-protected metrics page at `/admin` showing game
+  and player statistics.
+- **Game completion tracking**: Games are marked as ended immediately upon
+  completion with recorded metrics.
+- **Hand probability validation tests**: Statistical tests verifying correct
+  distribution of dealt hands.
+
 ## [1.1.0] — 2026-02-10
 
 ### Fixed

@@ -20,16 +20,14 @@ class GameStatus(str, Enum):
 class CreateGameRequest(BaseModel):
     creator_name: str = Field(..., min_length=1, max_length=20)
     creator_pin: str = Field(..., pattern=r"^\d{4}$")
-    starting_chips: int = Field(default=1000, ge=100, le=100000)
-    small_blind: int = Field(default=10, ge=1)
-    big_blind: int = Field(default=20, ge=2)
+    starting_chips: int = Field(default=5000, ge=100, le=100000)
     max_players: int = Field(default=50, ge=2, le=50)
     allow_rebuys: bool = Field(default=True)
     max_rebuys: int = Field(default=1, ge=0, le=99)  # 0 = unlimited
     rebuy_cutoff_minutes: int = Field(default=60, ge=0, le=480)  # 0 = no cutoff
     turn_timeout: int = Field(default=0, ge=0, le=300)  # seconds, 0 = no timer
-    blind_level_duration: int = Field(default=0, ge=0, le=120)  # minutes, 0 = disabled
-    blind_multiplier: float = Field(default=2.0, ge=0, le=2.0)
+    blind_level_duration: int = Field(default=20, ge=5, le=60)  # minutes
+    target_game_time: int = Field(default=4, ge=0, le=12)  # hours, 0 = fixed blinds
     auto_deal_enabled: bool = True  # auto-deal next hand
 
 
@@ -63,15 +61,13 @@ class PlayerInfo(BaseModel):
 
 class GameSettings(BaseModel):
     starting_chips: int
-    small_blind: int
-    big_blind: int
     max_players: int
     allow_rebuys: bool
     max_rebuys: int = 1  # 0 = unlimited
     rebuy_cutoff_minutes: int = 60  # 0 = no cutoff
     turn_timeout: int = 0  # seconds, 0 = no timer
-    blind_level_duration: int = 0  # minutes, 0 = disabled
-    blind_multiplier: float = 2.0  # blind increase multiplier
+    blind_level_duration: int = 20  # minutes
+    target_game_time: int = 4  # hours, 0 = fixed blinds
     auto_deal_enabled: bool = True  # auto-deal next hand
 
 
